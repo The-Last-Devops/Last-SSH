@@ -10,6 +10,8 @@ class P2PService {
     this.peerId = '';
     this.isConnecting = false;
     this.isMock = false;
+    this.mockChannel = null;
+    this.targetPeerId = ''; // Lưu trữ đối tác trong chế độ mock
 
     // Callbacks
     this.onIdReady = null;
@@ -23,10 +25,50 @@ class P2PService {
   async initPeer(customId = '') {
     this.disconnect();
 
-    // Kiểm tra môi trường chạy
-    if (typeof window === 'undefined' || process.env.NODE_ENV === 'test') {
+    // Kiểm tra môi trường chạy (Thêm window.__e2e__ cho E2E Testing)
+    if (typeof window === 'undefined' || process.env.NODE_ENV === 'test' || (typeof window !== 'undefined' && window.__e2e__)) {
       this.isMock = true;
       this.peerId = customId || 'mock-peer-' + Math.floor(1000 + Math.random() * 9000);
+      
+      // Sử dụng BroadcastChannel để giao tiếp chéo tab/context trong E2E testing
+      if (typeof window !== 'undefined' && window.BroadcastChannel) {
+        try {
+          this.mockChannel = new BroadcastChannel('terminus-mock-p2p');
+          this.mockChannel.onmessage = (event) => {
+            const msg = event.data;
+            if (!msg) return;
+
+            if (msg.type === 'CONNECT_REQUEST' && msg.target === this.peerId) {
+              this.targetPeerId = msg.sender;
+              this.isConnecting = false;
+              
+              // Trả lời xác nhận kết nối
+              this.mockChannel.postMessage({
+                type: 'CONNECT_ACCEPT',
+                sender: this.peerId,
+                target: msg.sender
+              });
+              
+              if (this.onConnected) this.onConnected(msg.sender);
+            } 
+            else if (msg.type === 'CONNECT_ACCEPT' && msg.target === this.peerId) {
+              this.targetPeerId = msg.sender;
+              this.isConnecting = false;
+              if (this.onConnected) this.onConnected(msg.sender);
+            } 
+            else if (msg.type === 'DATA_SEND' && msg.target === this.peerId) {
+              this.handleReceivedData(msg.packet);
+            } 
+            else if (msg.type === 'DISCONNECT' && msg.target === this.peerId) {
+              this.targetPeerId = '';
+              if (this.onDisconnected) this.onDisconnected();
+            }
+          };
+        } catch (e) {
+          console.warn('Lỗi khởi tạo BroadcastChannel mock P2P:', e);
+        }
+      }
+
       setTimeout(() => {
         if (this.onIdReady) this.onIdReady(this.peerId);
       }, 50);
@@ -79,13 +121,23 @@ class P2PService {
   async connectToPeer(targetPeerId) {
     if (!targetPeerId) return false;
     this.isConnecting = true;
+    this.targetPeerId = targetPeerId;
 
     if (this.isMock) {
-      // Giả lập kết nối P2P trong kiểm thử
-      setTimeout(() => {
-        this.isConnecting = false;
-        if (this.onConnected) this.onConnected('mock-connection-id');
-      }, 100);
+      if (this.mockChannel) {
+        // Gửi kết nối qua BroadcastChannel
+        this.mockChannel.postMessage({
+          type: 'CONNECT_REQUEST',
+          sender: this.peerId,
+          target: targetPeerId
+        });
+      } else {
+        // Chạy unit test đơn lẻ
+        setTimeout(() => {
+          this.isConnecting = false;
+          if (this.onConnected) this.onConnected('mock-connection-id');
+        }, 50);
+      }
       return true;
     }
 
@@ -117,6 +169,7 @@ class P2PService {
 
     conn.on('open', () => {
       this.isConnecting = false;
+      this.targetPeerId = conn.peer;
       if (this.onConnected) this.onConnected(conn.peer);
     });
 
@@ -136,6 +189,16 @@ class P2PService {
 
   // Đóng kết nối hiện tại
   disconnect() {
+    if (this.isMock && this.mockChannel && this.targetPeerId) {
+      try {
+        this.mockChannel.postMessage({
+          type: 'DISCONNECT',
+          sender: this.peerId,
+          target: this.targetPeerId
+        });
+      } catch (e) {}
+    }
+
     if (this.connection) {
       try { this.connection.close(); } catch(e) {}
       this.connection = null;
@@ -144,7 +207,14 @@ class P2PService {
       try { this.peer.destroy(); } catch(e) {}
       this.peer = null;
     }
+
+    if (this.mockChannel) {
+      try { this.mockChannel.close(); } catch(e) {}
+      this.mockChannel = null;
+    }
+
     this.peerId = '';
+    this.targetPeerId = '';
     this.isConnecting = false;
   }
 
@@ -155,7 +225,7 @@ class P2PService {
     }
 
     try {
-      // 1. Chuẩn bị payload dữ liệu toàn bộ ứng dụng
+      // 1. Chuần bị payload dữ liệu toàn bộ ứng dụng
       const payload = {
         virtualFS: virtualFS.exportFS(),
         connections: connectionsList,
@@ -164,7 +234,6 @@ class P2PService {
       };
 
       // 2. Mã hóa dữ liệu bằng AES-GCM với mã PIN
-      // Nếu PIN rỗng, chúng ta dùng một mật khẩu mặc định tạm thời để đóng gói JSON an toàn
       const encryptionPassword = pin || 'terminus_temp_sync_key';
       const encryptedString = await securityService.encrypt(JSON.stringify(payload), encryptionPassword);
 
@@ -174,12 +243,21 @@ class P2PService {
         hasPinProtection: !!pin
       };
 
-      // 3. Gửi gói tin qua P2P
+      // 3. Gửi gói tin
       if (this.isMock) {
-        // Giả lập nhận dữ liệu trong kiểm thử
-        setTimeout(() => {
-          this.handleReceivedData(packet);
-        }, 50);
+        if (this.mockChannel) {
+          this.mockChannel.postMessage({
+            type: 'DATA_SEND',
+            sender: this.peerId,
+            target: this.targetPeerId,
+            packet: packet
+          });
+        } else {
+          // Unit test đơn lẻ
+          setTimeout(() => {
+            this.handleReceivedData(packet);
+          }, 50);
+        }
       } else {
         this.connection.send(packet);
       }
@@ -195,7 +273,7 @@ class P2PService {
   handleReceivedData(data) {
     if (data && data.type === 'TERMINUS_SYNC_PAYLOAD') {
       if (this.onDataReceived) {
-        // Trả ra gói tin mã hóa kèm cờ bảo vệ PIN cho UI xử lý (hỏi nhập PIN giải mã)
+        // Trả ra gói tin mã hóa kèm cờ bảo vệ PIN cho UI xử lý
         this.onDataReceived({
           encryptedPayload: data.payload,
           hasPinProtection: data.hasPinProtection

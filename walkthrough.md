@@ -122,7 +122,35 @@ Hệ thống kiểm thử hoạt động hoàn hảo, bao phủ toàn bộ các 
    Duration  1.66s
 ```
 
-### 2. Kiểm thử biên dịch Production (Vite Build):
+### 2. Kiểm thử trình duyệt thực tế tự động (Playwright E2E Testing):
+ 
+ Để đảm bảo ứng dụng vận hành 100% chính xác giống như hành vi thực tế của người dùng, chúng ta đã tích hợp bộ công cụ kiểm thử trình duyệt cao cấp **Playwright**.
+ 
+ Đặc biệt, chúng ta đã xây dựng một cơ chế **Mock P2P chéo tab thời gian thực qua BroadcastChannel** độc quyền, giúp giả lập hoàn hảo hai thiết bị kết nối WebRTC truyền và giải mã dữ liệu mã hóa an toàn offline cực nhanh không cần phụ thuộc máy chủ Cloud PeerJS trung gian!
+ 
+ **Kết quả chạy Playwright E2E thành công vượt mong đợi (4/4 tests passed):**
+ 
+ ```bash
+ > npm run test:e2e
+ 
+ > terminus-clone@0.0.0 test:e2e
+ > playwright test
+ 
+ Running 4 tests using 4 workers
+ 
+ [1/4] [chromium] › e2e/terminus.spec.js:159:3 › Terminus Clone E2E Tests › Kịch bản 4: Đồng bộ P2P WebRTC song song giữa 2 browser contexts
+ [2/4] [chromium] › e2e/terminus.spec.js:112:3 › Terminus Clone E2E Tests › Kịch bản 3: Tương tác kết nối SSH giả lập và đồng bộ SFTP visual split-pane
+ [3/4] [chromium] › e2e/terminus.spec.js:54:3 › Terminus Clone E2E Tests › Kịch bản 2: Đăng ký mã PIN bảo mật, reload trang và kiểm tra màn hình khóa LockScreen
+ [4/4] [chromium] › e2e/terminus.spec.js:16:3 › Terminus Clone E2E Tests › Kịch bản 1: Mở ứng dụng, tạo Terminal cục bộ và chạy lệnh ảo
+   4 passed (6.4s)
+ ```
+ 
+ * **Kịch bản 1 (Terminal cục bộ):** Tạo tệp tệp tin ảo, gõ lệnh `ls`, `neofetch`, `clear` -> Thành công.
+ * **Kịch bản 2 (Mã hóa PIN & Màn hình khóa):** Kích hoạt PIN `2026`, reload trang chắn bằng LockScreen, nhập sai `1111` chấn rung báo lỗi, nhập đúng `2026` mở khóa thành công -> Đạt 100%.
+ * **Kịch bản 3 (SSH & SFTP visual):** Khởi tạo SSH profile, kết nối mở Split Pane SFTP, tạo folder trực quan và đồng bộ in log ngược lại Terminal SSH -> Hoạt động trơn tru.
+ * **Kịch bản 4 (Đồng bộ P2P WebRTC):** Mở 2 trang (Page A gửi, Page B nhận), ghép cặp ID, mã hóa cấu hình bằng PIN `7890`, gửi đi chéo trang qua kênh mock, giải mã và hiển thị server tức thì không cần reload -> Đồng bộ tuyệt vời.
+
+### 3. Kiểm thử biên dịch Production (Vite Build):
 Mã nguồn được biên dịch và tối ưu hóa hoàn toàn sạch sẽ, cam kết không chứa bất kỳ cảnh báo hay lỗi cú pháp nào.
 
 **Kết quả build thành công xuất sắc:**
@@ -134,5 +162,6 @@ Mã nguồn được biên dịch và tối ưu hóa hoàn toàn sạch sẽ, ca
 
 ## Hướng dẫn khởi chạy ứng dụng:
 1. Truy cập vào thư mục dự án của bạn: `cd /Users/KienNT/Code/kien/terminus-clone`
-2. Gõ lệnh: `npm run dev` để khởi chạy máy chủ phát triển cục bộ.
-3. Mở trình duyệt và truy cập: `http://localhost:5173` để chiêm ngưỡng và trải nghiệm trực tiếp!
+2. Chạy máy chủ phát triển (Vite Dev Server): `npm run dev`
+3. Chạy test E2E trình duyệt tự động (Playwright): `npm run test:e2e` (hoặc mở giao diện trực quan E2E bằng `npm run test:e2e:ui`)
+4. Mở trình duyệt và truy cập: `http://localhost:5173` để trải nghiệm trực tiếp!

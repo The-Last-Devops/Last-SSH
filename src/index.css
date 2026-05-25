@@ -152,13 +152,20 @@
   user-select: none;
 }
 
+html {
+  background-color: #0d0a15;
+  color-scheme: dark !important;
+}
+
 body {
   font-family: 'Inter', 'Outfit', sans-serif;
   overflow: hidden;
   height: 100vh;
   width: 100vw;
   background: var(--bg-gradient);
+  background-color: #0d0a15;
   color: var(--text-main);
+  color-scheme: dark !important;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background 0.5s ease;
@@ -254,6 +261,12 @@ body {
   outline: none;
   font-family: inherit;
   transition: all 0.2s ease;
+  color-scheme: dark !important;
+}
+
+.glass-input option {
+  background-color: #161224;
+  color: #e2daeb;
 }
 
 .glass-input:focus {
