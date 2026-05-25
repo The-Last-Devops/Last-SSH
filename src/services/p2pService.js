@@ -31,7 +31,7 @@ class P2PService {
       this.peerId = customId || 'mock-peer-' + Math.floor(1000 + Math.random() * 9000);
       
       // Sử dụng BroadcastChannel để giao tiếp chéo tab/context trong E2E testing
-      if (typeof window !== 'undefined' && window.BroadcastChannel) {
+      if (typeof window !== 'undefined' && window.__e2e__ && window.BroadcastChannel) {
         try {
           this.mockChannel = new BroadcastChannel('terminus-mock-p2p');
           this.mockChannel.onmessage = (event) => {

@@ -11,6 +11,10 @@ export default defineConfig({
     baseURL: 'http://localhost:5173',
     trace: 'on-first-retry',
     viewport: { width: 1280, height: 720 },
+    launchOptions: {
+      // Làm chậm 600ms sau mỗi thao tác (click, fill, gõ bàn phím) giống như người dùng thật
+      slowMo: 600,
+    },
   },
   projects: [
     {

@@ -98,7 +98,7 @@ export default function TerminalTab({
     // Mặc định là Local Shell
     return (
       <span className="terminal-prompt">
-        user@terminus-clone:{tab.currentPath} $
+        user@lastssh:{tab.currentPath} $
       </span>
     );
   };

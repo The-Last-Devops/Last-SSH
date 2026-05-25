@@ -17,7 +17,7 @@ describe('Shell Command Engine (shellEngine)', () => {
 
   it('nên thực thi lệnh help và pwd chính xác', () => {
     const resHelp = shellEngine.execute('/home/user', 'help');
-    expect(resHelp.stdout).toContain('Hệ thống Terminus Clone v1.0.0');
+    expect(resHelp.stdout).toContain('Hệ thống Last SSH v1.0.0');
     expect(resHelp.stderr).toBe('');
 
     const resPwd = shellEngine.execute('/home/user/documents', 'pwd');

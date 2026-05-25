@@ -275,11 +275,11 @@ class SecurityService {
       const options = {
         publicKey: {
           challenge: challenge,
-          rp: { name: 'Terminus Clone Web' },
+          rp: { name: 'lastSSH Web' },
           user: {
             id: userId,
-            name: 'user@terminus-clone',
-            displayName: 'User Terminus'
+            name: 'user@lastssh',
+            displayName: 'User lastSSH'
           },
           pubKeyCredParams: [{ alg: -7, type: 'public-key' }, { alg: -257, type: 'public-key' }], // ES256 & RS256
           authenticatorSelection: {

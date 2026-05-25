@@ -22,7 +22,7 @@ const DEFAULT_FS = {
                   name: 'welcome.txt',
                   type: 'file',
                   updatedAt: new Date().toISOString(),
-                  content: 'Chào mừng bạn đến với Terminus Clone!\nĐây là hệ thống tệp tin giả lập trực tiếp trên trình duyệt của bạn.\nTất cả những chỉnh sửa của bạn ở đây sẽ được lưu trữ cục bộ (LocalStorage).\n\nChúc bạn có những trải nghiệm tuyệt vời!'
+                  content: 'Chào mừng bạn đến với Last SSH!\nĐây là hệ thống tệp tin giả lập trực tiếp trên trình duyệt của bạn.\nTất cả những chỉnh sửa của bạn ở đây sẽ được lưu trữ cục bộ (LocalStorage).\n\nChúc bạn có những trải nghiệm tuyệt vời!'
                 },
                 'todo.txt': {
                   name: 'todo.txt',

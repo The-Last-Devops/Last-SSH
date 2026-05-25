@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Terminus Clone E2E Tests', () => {
+test.describe('Last SSH E2E Tests', () => {
 
   test.beforeEach(async ({ page }) => {
     // Đăng ký script tiêm cờ __e2e__ vào window trước khi React tải
@@ -41,7 +41,7 @@ test.describe('Terminus Clone E2E Tests', () => {
     await hiddenInput.fill('neofetch');
     await page.keyboard.press('Enter');
     // Cập nhật string chính xác từ shellEngine
-    await expect(terminalHistory).toContainText('OS: Terminus-Clone Web OS v1.0');
+    await expect(terminalHistory).toContainText('OS: Last SSH Web OS v1.0');
 
     // Chạy lệnh clear để dọn sạch màn hình
     await hiddenInput.fill('clear');
@@ -213,7 +213,7 @@ test.describe('Terminus Clone E2E Tests', () => {
     await expect(pageA.locator('text=Đã gửi dữ liệu mã hóa thành công')).toBeVisible();
 
     // 8. Thiết bị B: Phát hiện gói tin đã nhận. Nhập PIN 7890 để giải mã và áp dụng
-    await pageB.waitForSelector('text=Thiết bị đối tác vừa gửi cho bạn một gói cấu hình Terminus!');
+    await pageB.waitForSelector('text=Thiết bị đối tác vừa gửi cho bạn một gói cấu hình Last SSH!');
     await pageB.locator('input[placeholder="Nhập PIN giải mã"]').fill('7890');
 
     // Bấm Giải mã và Áp dụng

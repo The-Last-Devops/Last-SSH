@@ -95,7 +95,7 @@ export default function Sidebar({
         <div className="sidebar-logo">
           <Terminal size={18} />
         </div>
-        <span className="sidebar-title">TERMINUS</span>
+        <span className="sidebar-title">Last SSH</span>
       </div>
 
       {/* Sidebar Content (Scrollable) */}

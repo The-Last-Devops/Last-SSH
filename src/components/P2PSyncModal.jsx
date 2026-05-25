@@ -296,7 +296,7 @@ export default function P2PSyncModal({
                 <form onSubmit={handleImportSyncData} className="p2p-action-center" style={{ border: '1px solid var(--term-yellow)', background: 'rgba(241, 196, 15, 0.05)' }}>
                   <span className="p2p-action-title" style={{ color: 'var(--term-yellow)' }}>NHẬN DỮ LIỆU ĐỒNG BỘ MỚI</span>
                   <p style={{ fontSize: '12px', color: 'var(--text-main)', textAlign: 'center' }}>
-                    Thiết bị đối tác vừa gửi cho bạn một gói cấu hình Terminus!
+                    Thiết bị đối tác vừa gửi cho bạn một gói cấu hình Last SSH!
                   </p>
                   
                   {receivedData.hasPinProtection ? (

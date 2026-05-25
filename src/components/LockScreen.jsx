@@ -106,7 +106,7 @@ export default function LockScreen({ onUnlockSuccess }) {
 
         {/* Title */}
         <div>
-          <h2 className="lockscreen-title">TERMINUS CLONE</h2>
+          <h2 className="lockscreen-title">Last SSH</h2>
           <span className="lockscreen-subtitle">Ứng dụng đã được mã hóa an toàn</span>
         </div>
 

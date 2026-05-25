@@ -29,7 +29,7 @@ describe('LockScreen Component (Integration)', () => {
     render(<LockScreen onUnlockSuccess={() => {}} />);
     
     // Kiểm tra tiêu đề chính
-    expect(screen.getByText('TERMINUS CLONE')).toBeInTheDocument();
+    expect(screen.getByText('Last SSH')).toBeInTheDocument();
     expect(screen.getByText('Ứng dụng đã được mã hóa an toàn')).toBeInTheDocument();
     
     // Kiểm tra keypad từ 0-9

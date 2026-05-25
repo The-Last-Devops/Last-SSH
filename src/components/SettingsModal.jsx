@@ -95,7 +95,7 @@ export default function SettingsModal({
       
       // Tiến hành đăng ký vân tay
       await securityService.registerBiometrics(pin);
-      alert('Đã liên kết sinh trắc học vân tay hệ điều hành thành công! Bạn có thể quét vân tay để mở khóa Terminus.');
+      alert('Đã liên kết sinh trắc học vân tay hệ điều hành thành công! Bạn có thể quét vân tay để mở khóa Last SSH.');
     } catch (err) {
       alert('Không thể liên kết sinh trắc học: ' + err.message);
     }
@@ -176,7 +176,7 @@ export default function SettingsModal({
         
         {/* Header */}
         <div className="modal-header">
-          <span className="modal-title">TERMINUS PREFERENCES</span>
+          <span className="modal-title">Last SSH PREFERENCES</span>
           <button className="modal-close-btn" onClick={onClose}>
             <X size={16} />
           </button>

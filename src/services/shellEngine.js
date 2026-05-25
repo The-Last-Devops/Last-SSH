@@ -47,7 +47,7 @@ export class ShellEngine {
     if (!COMMANDS.includes(command)) {
       return { 
         stdout: '', 
-        stderr: `terminus: ${command}: command not found. Type 'help' to see available commands.`, 
+        stderr: `lastssh: ${command}: command not found. Type 'help' to see available commands.`, 
         newPath: currentPath 
       };
     }
@@ -162,7 +162,7 @@ export class ShellEngine {
   // 1. Lệnh Help
   cmdHelp() {
     const list = [
-      'Hệ thống Terminus Clone v1.0.0 - Các lệnh giả lập được hỗ trợ:',
+      'Hệ thống Last SSH v1.0.0 - Các lệnh giả lập được hỗ trợ:',
       '------------------------------------------------------------------',
       '  help                     Hiển thị danh sách trợ giúp này',
       '  ls [đường_dẫn]           Liệt kê thư mục hiện tại hoặc đường dẫn',
@@ -304,13 +304,13 @@ export class ShellEngine {
     const uptimeStr = min > 0 ? `${min}m ${sec}s` : `${sec}s`;
 
     const logo = [
-      '    \x1b[1;35m/\\_/\\  \x1b[0m    \x1b[1;36mKienNT@terminus-web\x1b[0m',
+      '    \x1b[1;35m/\\_/\\  \x1b[0m    \x1b[1;36mKienNT@lastssh-web\x1b[0m',
       '   \x1b[1;35m( o.o ) \x1b[0m    -------------------',
-      '    \x1b[1;35m> ^ <  \x1b[0m    \x1b[1;33mOS\x1b[0m: Terminus-Clone Web OS v1.0',
+      '    \x1b[1;35m> ^ <  \x1b[0m    \x1b[1;33mOS\x1b[0m: Last SSH Web OS v1.0',
       '   \x1b[1;34m/     \\ \x1b[0m    \x1b[1;33mHost\x1b[0m: Gemini-Agent Client v1',
       '  \x1b[1;34m(|     |)\x1b[0m    \x1b[1;33mKernel\x1b[0m: Web-HTML5/React Engine',
       '   \x1b[1;34m===   ===\x1b[0m   \x1b[1;33mUptime\x1b[0m: ${uptimeStr}',
-      '  \x1b[1;31m(___)___)\x1b[0m    \x1b[1;33mShell\x1b[0m: TerminusMockShell v1.0.0',
+      '  \x1b[1;31m(___)___)\x1b[0m    \x1b[1;33mShell\x1b[0m: LastSSHMockShell v1.0.0',
       '               \x1b[1;33mTheme\x1b[0m: ${activeTheme}',
       '               \x1b[1;33mFont\x1b[0m: Fira Code / Source Code Pro',
       '               \x1b[1;33mCPU\x1b[0m: Simulated Gemini CPU @ 3.5GHz',

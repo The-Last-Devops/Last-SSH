@@ -109,7 +109,7 @@ export default function App() {
       type: 'local',
       currentPath: '/home/user',
       history: [
-        { type: 'system', text: 'Welcome to Terminus Clone (React + Vite) v1.0.0.' },
+        { type: 'system', text: 'Welcome to Last SSH (React + Vite) v1.0.0.' },
         { type: 'system', text: "Type 'help' to see simulated commands, or 'neofetch' for system info." }
       ],
       commandHistory: []
@@ -199,7 +199,7 @@ export default function App() {
     const session = sshSimulator.getSession(tabId);
     const promptString = session 
       ? `\r${session.username}@${session.host}:${session.currentPath} $ `
-      : `\ruser@terminus-clone:${tab.currentPath} $ `;
+      : `\ruser@lastssh:${tab.currentPath} $ `;
     
     newHistory.push({ type: 'output', text: promptString });
 
