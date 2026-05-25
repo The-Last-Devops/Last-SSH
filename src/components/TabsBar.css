@@ -1,0 +1,144 @@
+/* ==========================================================================
+   TABSBAR COMPONENT STYLES (Glassmorphic Tab Controls)
+   ========================================================================== */
+
+.tabs-bar-container {
+  display: flex;
+  align-items: center;
+  flex-grow: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  height: 100%;
+  padding-left: 8px;
+  gap: 4px;
+}
+
+/* Ẩn thanh cuộn x để nhìn gọn gàng */
+.tabs-bar-container::-webkit-scrollbar {
+  height: 0px;
+}
+
+/* Individual Tab Element */
+.tab-item {
+  display: flex;
+  align-items: center;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 8px 8px 0 0;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  border-bottom: none;
+  cursor: pointer;
+  max-width: 180px;
+  min-width: 90px;
+  gap: 8px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  margin-top: 10px; /* tạo cảm giác các tab nhô lên */
+}
+
+.tab-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--border-highlight);
+}
+
+.tab-item.active {
+  background: var(--terminal-bg);
+  border-color: var(--border-highlight);
+  border-bottom: 2px solid var(--accent) !important;
+  z-index: 2;
+  box-shadow: 0 -4px 10px rgba(0,0,0,0.3);
+}
+
+.tab-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.tab-item.active .tab-icon {
+  color: var(--accent);
+}
+
+/* Title and Inline Rename Input */
+.tab-title-wrapper {
+  flex-grow: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.tab-title-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab-item.active .tab-title-text {
+  color: var(--text-bright);
+  font-weight: 600;
+}
+
+.tab-rename-input {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--text-bright);
+  font-size: 12px;
+  padding: 2px 6px;
+  outline: none;
+  font-family: inherit;
+}
+
+/* Close Tab Button */
+.tab-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+.tab-item:hover .tab-close-btn {
+  opacity: 1;
+}
+
+.tab-close-btn:hover {
+  background: rgba(255, 85, 98, 0.15);
+  color: var(--term-red);
+}
+
+/* Inline tab creation shortcut '+' button */
+.tab-add-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 10px;
+  margin-left: 8px;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.tab-add-btn:hover {
+  background: rgba(var(--accent-rgb), 0.15);
+  border-color: var(--accent);
+  color: var(--text-bright);
+  box-shadow: 0 0 8px var(--accent-glow);
+}

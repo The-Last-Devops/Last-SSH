@@ -1,0 +1,389 @@
+/* import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Source+Code+Pro:wght@400;500;700&display=swap');
+
+/* ==========================================================================
+   DESIGN SYSTEM - THEME VARIABLES (HSL Tailored)
+   ========================================================================== */
+
+/* 1. Theme: Glass Aura (Mặc định - Cực kỳ sang trọng) */
+.theme-glass-aura {
+  --bg-gradient: radial-gradient(circle at 50% 50%, #1a1528 0%, #0d0a15 100%);
+  --panel-bg: rgba(22, 17, 36, 0.45);
+  --sidebar-bg: rgba(14, 11, 23, 0.55);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-highlight: rgba(255, 255, 255, 0.15);
+  
+  --text-main: #e2daeb;
+  --text-muted: #8d809d;
+  --text-bright: #ffffff;
+  
+  --accent: #aa3bff;
+  --accent-rgb: 170, 59, 255;
+  --accent-glow: rgba(170, 59, 255, 0.35);
+  
+  --terminal-bg: rgba(13, 10, 20, 0.85);
+  --terminal-cursor: #aa3bff;
+  
+  /* Màu hiển thị log Terminal */
+  --term-blue: #70b0ff;
+  --term-green: #48da93;
+  --term-yellow: #f1c40f;
+  --term-red: #ff5562;
+  --term-magenta: #e06c75;
+  --term-cyan: #56b6c2;
+}
+
+/* 2. Theme: Cyberpunk Neon (Rực rỡ, phá cách) */
+.theme-cyberpunk {
+  --bg-gradient: linear-gradient(135deg, #0f051d 0%, #030008 100%);
+  --panel-bg: rgba(20, 2, 35, 0.5);
+  --sidebar-bg: rgba(8, 0, 16, 0.7);
+  --border-color: rgba(0, 240, 255, 0.2);
+  --border-highlight: rgba(255, 0, 128, 0.4);
+  
+  --text-main: #00f0ff;
+  --text-muted: #8a3eb5;
+  --text-bright: #ff007f;
+  
+  --accent: #ff007f;
+  --accent-rgb: 255, 0, 127;
+  --accent-glow: rgba(255, 0, 127, 0.5);
+  
+  --terminal-bg: rgba(5, 0, 10, 0.9);
+  --terminal-cursor: #00f0ff;
+  
+  --term-blue: #00f0ff;
+  --term-green: #39ff14;
+  --term-yellow: #ffff33;
+  --term-red: #ff007f;
+  --term-magenta: #ff00ff;
+  --term-cyan: #00ffff;
+}
+
+/* 3. Theme: One Dark Pro (Cổ điển chuyên nghiệp) */
+.theme-one-dark {
+  --bg-gradient: radial-gradient(circle, #282c34 0%, #1e222b 100%);
+  --panel-bg: rgba(33, 37, 43, 0.7);
+  --sidebar-bg: rgba(27, 30, 36, 0.85);
+  --border-color: rgba(255, 255, 255, 0.05);
+  --border-highlight: rgba(97, 175, 239, 0.3);
+  
+  --text-main: #abb2bf;
+  --text-muted: #5c6370;
+  --text-bright: #e06c75;
+  
+  --accent: #61afef;
+  --accent-rgb: 97, 175, 239;
+  --accent-glow: rgba(97, 175, 239, 0.2);
+  
+  --terminal-bg: #21252b;
+  --terminal-cursor: #528bff;
+  
+  --term-blue: #61afef;
+  --term-green: #98c379;
+  --term-yellow: #d19a66;
+  --term-red: #e06c75;
+  --term-magenta: #c678dd;
+  --term-cyan: #56b6c2;
+}
+
+/* 4. Theme: Dracula (Huyền bí) */
+.theme-dracula {
+  --bg-gradient: linear-gradient(180deg, #282a36 0%, #1e1f29 100%);
+  --panel-bg: rgba(40, 42, 54, 0.65);
+  --sidebar-bg: rgba(30, 31, 41, 0.85);
+  --border-color: rgba(255, 255, 255, 0.06);
+  --border-highlight: rgba(189, 147, 249, 0.35);
+  
+  --text-main: #f8f8f2;
+  --text-muted: #6272a4;
+  --text-bright: #ff79c6;
+  
+  --accent: #bd93f9;
+  --accent-rgb: 189, 147, 249;
+  --accent-glow: rgba(189, 147, 249, 0.3);
+  
+  --terminal-bg: rgba(40, 42, 54, 0.9);
+  --terminal-cursor: #f8f8f0;
+  
+  --term-blue: #8be9fd;
+  --term-green: #50fa7b;
+  --term-yellow: #f1fa8c;
+  --term-red: #ff5555;
+  --term-magenta: #ff79c6;
+  --term-cyan: #8be9fd;
+}
+
+/* 5. Theme: Retro Amber (CRT Hoài cổ) */
+.theme-retro-amber {
+  --bg-gradient: radial-gradient(circle, #1a0f00 0%, #050300 100%);
+  --panel-bg: rgba(20, 10, 0, 0.5);
+  --sidebar-bg: rgba(10, 5, 0, 0.7);
+  --border-color: rgba(255, 170, 0, 0.15);
+  --border-highlight: rgba(255, 176, 0, 0.4);
+  
+  --text-main: #ffb000;
+  --text-muted: #9c6a00;
+  --text-bright: #ffcc00;
+  
+  --accent: #ffb000;
+  --accent-rgb: 255, 176, 0;
+  --accent-glow: rgba(255, 176, 0, 0.4);
+  
+  --terminal-bg: rgba(5, 2, 0, 0.95);
+  --terminal-cursor: #ffb000;
+  
+  --term-blue: #ffa000;
+  --term-green: #ffb000;
+  --term-yellow: #ffd000;
+  --term-red: #ff4000;
+  --term-magenta: #e65c00;
+  --term-cyan: #ffb000;
+}
+
+/* ==========================================================================
+   GLOBAL CONFIG & RESET
+   ========================================================================== */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+body {
+  font-family: 'Inter', 'Outfit', sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+  background: var(--bg-gradient);
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background 0.5s ease;
+}
+
+/* Cho phép chọn văn bản trong Terminal */
+.selectable, code, pre, input, textarea {
+  user-select: text;
+}
+
+#root {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   GLASSMORPHISM & SHADOW UTILITIES
+   ========================================================================== */
+
+.glass-container {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  background: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  overflow: hidden;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.glass-panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.glass-button {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-button:hover:not(:disabled) {
+  background: rgba(var(--accent-rgb), 0.15);
+  border-color: var(--border-highlight);
+  color: var(--text-bright);
+  box-shadow: 0 0 10px var(--accent-glow);
+  transform: translateY(-1px);
+}
+
+.glass-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.glass-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.glass-button.active {
+  background: rgba(var(--accent-rgb), 0.25);
+  border-color: var(--accent);
+  color: var(--text-bright);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+.glass-input {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-bright);
+  padding: 8px 12px;
+  outline: none;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.glass-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+/* ==========================================================================
+   SCROLLBAR STYLING
+   ========================================================================== */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+/* ==========================================================================
+   SPECIAL EFFECTS (CRT SCREEN, SCANLINES, CURSOR)
+   ========================================================================== */
+
+/* Scanlines overlay effect */
+.crt-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.crt-effect::after {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+  z-index: 99;
+  background-size: 100% 3px, 6px 100%;
+  pointer-events: none;
+}
+
+/* CRT Screen curve and flicker simulator */
+@keyframes crt-flicker {
+  0% { opacity: 0.985; }
+  50% { opacity: 0.999; }
+  100% { opacity: 0.985; }
+}
+
+.crt-flicker {
+  animation: crt-flicker 0.15s infinite;
+}
+
+/* Pulsing block cursor */
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.cursor-blink-block {
+  display: inline-block;
+  width: 8px;
+  height: 15px;
+  background: var(--terminal-cursor);
+  animation: blink 1s infinite;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+
+.cursor-blink-underline {
+  display: inline-block;
+  width: 8px;
+  height: 2px;
+  background: var(--terminal-cursor);
+  animation: blink 1s infinite;
+  vertical-align: bottom;
+  margin-left: 4px;
+}
+
+.cursor-blink-bar {
+  display: inline-block;
+  width: 2px;
+  height: 15px;
+  background: var(--terminal-cursor);
+  animation: blink 1s infinite;
+  vertical-align: middle;
+  margin-left: 2px;
+}
+
+/* Font classes for Terminal */
+.font-firacode {
+  font-family: 'Fira Code', 'Courier New', monospace;
+  font-variant-ligatures: normal;
+}
+
+.font-sourcecode {
+  font-family: 'Source Code Pro', 'Courier New', monospace;
+}
+
+.font-courier {
+  font-family: 'Courier New', Courier, monospace;
+}
+
+/* ==========================================================================
+   ANIMATIONS & TRANSITIONS
+   ========================================================================== */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.fade-in {
+  animation: fadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-30px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.slide-down {
+  animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}

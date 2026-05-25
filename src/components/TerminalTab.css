@@ -1,0 +1,122 @@
+/* ==========================================================================
+   TERMINALTAB COMPONENT STYLES (Retro CRT & Dynamic Colors)
+   ========================================================================== */
+
+.terminal-container {
+  width: 100%;
+  height: 100%;
+  background: var(--terminal-bg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  position: relative;
+  box-sizing: border-box;
+  outline: none;
+  cursor: text;
+}
+
+/* Container for all terminal logs */
+.terminal-history {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  flex-grow: 1;
+  justify-content: flex-end; /* bắt đầu cuộn từ dưới lên */
+}
+
+/* History line styles */
+.terminal-line {
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: inherit;
+  color: var(--text-main);
+}
+
+.terminal-line.type-input {
+  color: var(--text-bright);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+}
+
+.terminal-line.type-error {
+  color: var(--term-red);
+}
+
+.terminal-line.type-system {
+  color: var(--accent);
+}
+
+/* Prompt styles */
+.terminal-prompt {
+  color: var(--term-green);
+  font-weight: 600;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.terminal-prompt.ssh-prompt {
+  color: var(--term-blue);
+}
+
+/* Input Row styling */
+.terminal-input-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin-top: 4px;
+  flex-shrink: 0;
+  font-size: inherit;
+}
+
+.terminal-input-display {
+  color: var(--text-bright);
+  font-weight: 500;
+  flex-grow: 1;
+  display: inline-block;
+  white-space: pre-wrap;
+  word-break: break-all;
+  outline: none;
+}
+
+/* Hidden raw input */
+.terminal-hidden-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+}
+
+/* Styling ANSI colors parsing */
+.ansi-bold { font-weight: bold; }
+.ansi-cyan { color: var(--term-cyan); }
+.ansi-blue { color: var(--term-blue); }
+.ansi-green { color: var(--term-green); }
+.ansi-yellow { color: var(--term-yellow); }
+.ansi-red { color: var(--term-red); }
+.ansi-magenta { color: var(--term-magenta); }
+.ansi-white { color: var(--text-bright); }
+
+/* Theme custom glow enhancements */
+.theme-cyberpunk .terminal-line.type-input {
+  text-shadow: 0 0 5px rgba(0, 240, 255, 0.5);
+}
+
+.theme-retro-amber .terminal-container {
+  text-shadow: 0 0 4px rgba(255, 176, 0, 0.7);
+}
+
+/* CRT Scanlines overlays */
+.terminal-crt-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+}
