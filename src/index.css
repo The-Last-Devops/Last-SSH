@@ -141,6 +141,36 @@
   --term-cyan: #ffb000;
 }
 
+/* 6. Theme: Light Terminus (Giao diện sáng mặc định của Terminus) */
+.theme-light-terminus {
+  color-scheme: light !important;
+  --bg-gradient: linear-gradient(135deg, #ebedf0 0%, #d8dee4 100%);
+  --panel-bg: rgba(255, 255, 255, 0.75);
+  --sidebar-bg: rgba(244, 246, 248, 0.85);
+  --border-color: rgba(0, 0, 0, 0.08);
+  --border-highlight: rgba(255, 87, 34, 0.25);
+  
+  --text-main: #2d3748;
+  --text-muted: #718096;
+  --text-bright: #1a202c;
+  
+  --accent: #ff5722;
+  --accent-rgb: 255, 87, 34;
+  --accent-glow: rgba(255, 87, 34, 0.15);
+  
+  --terminal-bg: #f5f7f9;
+  --terminal-cursor: #ff5722;
+  
+  /* Màu log Terminal có độ tương phản cao, dễ đọc trên nền sáng */
+  --term-blue: #1e88e5;
+  --term-green: #2e7d32;
+  --term-yellow: #e65100;
+  --term-red: #c62828;
+  --term-magenta: #6a1b9a;
+  --term-cyan: #00838f;
+}
+
+
 /* ==========================================================================
    GLOBAL CONFIG & RESET
    ========================================================================== */
@@ -265,8 +295,8 @@ body {
 }
 
 .glass-input option {
-  background-color: #161224;
-  color: #e2daeb;
+  background-color: var(--terminal-bg);
+  color: var(--text-main);
 }
 
 .glass-input:focus {

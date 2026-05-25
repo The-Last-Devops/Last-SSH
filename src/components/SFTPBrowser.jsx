@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   Folder, 
   File, 
   FileText, 
   FileCode, 
   ArrowLeft, 
-  Download, 
   Upload, 
   FolderPlus, 
   Trash2, 
@@ -24,15 +23,18 @@ export default function SFTPBrowser({
   const [dragActive, setDragActive] = useState(false);
 
   // Load tệp tin từ SSH session mỗi khi thay đổi path hoặc tabId
-  const loadFiles = () => {
+  const loadFiles = useCallback(() => {
     if (!tabId || !currentPath) return;
     const fileList = sshSimulator.sftpList(tabId, currentPath);
     setItems(fileList);
-  };
+  }, [tabId, currentPath]);
 
   useEffect(() => {
-    loadFiles();
-  }, [tabId, currentPath]);
+    const initLoad = async () => {
+      loadFiles();
+    };
+    initLoad();
+  }, [loadFiles]);
 
   // Click vào mục (thư mục thì cd, file thì download)
   const handleItemClick = (item) => {

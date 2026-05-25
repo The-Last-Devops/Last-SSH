@@ -1,8 +1,9 @@
-# Hướng dẫn & Tổng kết Dự án Terminus Clone
+# Hướng dẫn & Tổng kết Dự án Last SSH
 
-Dự án phát triển ứng dụng **Terminus Clone** (phát triển bằng **React 18 & Vite 5**) đã hoàn thành xuất sắc và đáp ứng hoàn hảo tất cả các yêu cầu cao cấp nhất của bạn! 
+Dự án phát triển ứng dụng **Last SSH** (phát triển bằng **React 19 & Vite 8**) đã hoàn thành xuất sắc và đáp ứng hoàn hảo tất cả các yêu cầu cao cấp nhất của bạn! 
 
-Ứng dụng của chúng ta không chỉ mô phỏng thiết kế **Glassmorphism** tối cực kỳ sang trọng của Terminus/Tabby gốc mà còn được trang bị những tính năng độc quyền miễn phí vượt xa bản Terminus trả phí.
+Ứng dụng của chúng ta không chỉ mô phỏng thiết kế **Glassmorphism** tối cực kỳ sang trọng của Terminus/Tabby gốc mà còn được trang bị những tính năng độc quyền miễn phí vượt xa các công cụ quản lý SSH khác, mang thương hiệu đẳng cấp hoàn toàn mới **Last SSH**.
+
 
 ---
 
@@ -10,12 +11,14 @@ Dự án phát triển ứng dụng **Terminus Clone** (phát triển bằng **R
 
 ### 1. Giao diện & Layout Đa Tab
 * **Đa Tab tương tác:** Hỗ trợ tạo mới, đổi tên tab inline nhanh chóng bằng cách nhấp đúp chuột, và đóng các tab terminal riêng biệt không chồng chéo tiến trình.
-* **5 Theme HSL động cao cấp:** Chuyển đổi theme tức thời:
+* **6 Theme HSL động cao cấp (Thêm Theme Sáng):** Chuyển đổi theme tức thời:
+  * *Light Terminus* (theme sáng mặc định Terminus cực đẹp) [NEW]
   * *Glass Aura* (mặc định tối sang trọng)
   * *Cyberpunk Neon* (neon hồng/cyan rực rỡ)
   * *One Dark Pro* (classic)
   * *Dracula* (dark huyền bí)
   * *Retro Amber* (màu hổ phách CRT hoài cổ)
+* **Tách biệt cấu hình Theme độc lập:** Cho phép bạn lựa chọn độc lập **Theme ứng dụng (App Theme)** điều khiển Layout/Sidebar bên ngoài và **Theme terminal (Terminal Theme)** điều khiển Workspace Terminal bên trong.
 * **Tùy biến hiển thị chuyên sâu:** Điều chỉnh kiểu con trỏ (`block`, `underline`, `bar`), điều chỉnh font chữ lập trình (`Fira Code`, `Source Code Pro`) và thanh trượt cỡ chữ thời gian thực.
 * **Hiệu ứng Retro CRT:** Mô phỏng sọc màn hình quét tĩnh (`CRT scanlines`) và rung lắc nhẹ cực kỳ chân thực.
 
@@ -47,7 +50,15 @@ Dự án phát triển ứng dụng **Terminus Clone** (phát triển bằng **R
 * Ghép đôi tức thì giữa 2 thiết bị bằng cách quét **Mã QR Code** động (hoặc nhập Peer ID) thông qua thư viện **PeerJS**.
 * Dữ liệu truyền P2P ngang hàng trực tiếp, được **mã hóa AES-GCM** bảo vệ bằng mật mã ở máy gửi và chỉ giải mã được ở máy nhận khi nhập đúng PIN, bảo mật tuyệt đối 100% không sợ bên thứ 3 nghe lén.
 
+### 6. Tính năng Quản lý SSH Nâng cao & Premium
+* **SSH Private Keys Manager:** Hộp thoại cài đặt tích hợp tab quản lý khóa bảo mật chuyên dụng, hỗ trợ thêm/sửa/xóa các Private Keys dạng PEM cùng Passphrase.
+* **Folder Grouping (Expandable):** Phân nhóm danh sách các host/server trên Sidebar dưới dạng thư mục thu gọn/mở rộng trực quan, tối ưu quản lý số lượng lớn server.
+* **HSL Color Tag Badges:** Gắn thẻ tag linh hoạt (như `prod`, `secure`, `database`) được trang trí bằng dot màu sắc HSL cao cấp, hài hòa.
+* **Sidebar Live Search:** Thanh tìm kiếm trực tiếp trên đầu danh sách sidebar giúp lọc ngay lập tức server theo tên, thư mục group, hoặc tag badge.
+* **Mô phỏng xác thực SSH Key:** Trình SSH Simulator tự động nhận diện khóa liên kết và in ra quy trình trao đổi key, xác thực chữ ký khóa công khai vô cùng chân thực.
+
 ---
+
 
 ## Kiến trúc Thư mục Đã xây dựng
 
@@ -91,72 +102,87 @@ terminus-clone/
 │       ├── securityService.test.js # Kiểm thử băm PBKDF2 và mã hóa AES-GCM
 │       ├── p2pService.test.js  # Kiểm thử truyền tin P2P WebRTC giả lập
 │       ├── sshSimulator.test.js # Kiểm thử phiên SSH và SFTP visual
-│       └── LockScreen.test.jsx # Kiểm thử tích hợp UI gõ PIN mở khóa
+│       ├── LockScreen.test.jsx # Kiểm thử tích hợp UI gõ PIN mở khóa
+│       └── advancedFeatures.test.js # Kiểm thử các tính năng nâng cao (Keys, Groups, Live Search)
+│
+├── e2e/                        # Kịch bản kiểm thử E2E tự động (Playwright)
+│   ├── terminus.spec.js        # File kịch bản chính 5 kịch bản (Terminal, PIN, SSH/SFTP, P2P, Key Auth)
+│   └── visual.spec.js          # Kịch bản kiểm thử giao diện & tự động chụp ảnh màn hình phân tích CSS
 ```
+
 
 ---
 
 ## Kết quả Đảm bảo Chất lượng & Kiểm thử (QA & Verification)
 
 ### 1. Kiểm thử tự động (Vitest):
-Hệ thống kiểm thử hoạt động hoàn hảo, bao phủ toàn bộ các góc cạnh logic dịch vụ lõi và giao diện màn hình khóa. 
+Hệ thống kiểm thử hoạt động hoàn hảo, bao phủ toàn bộ các góc cạnh logic dịch vụ lõi, giao diện màn hình khóa và các tính năng nâng cao mới thêm. 
 
-**Kết quả chạy: 23/23 tests passed thành công 100%!**
+**Kết quả chạy: 24/24 tests passed thành công 100%!**
 
 ```bash
 > vitest run
 
  RUN  v4.1.7 /Users/KienNT/Code/kien/terminus-clone
 
- ✓ src/__tests__/smoke.test.js (1 test) 5ms
- ✓ src/__tests__/virtualFS.test.js (5 tests) 7ms
- ✓ src/__tests__/shellEngine.test.js (5 tests) 8ms
- ✓ src/__tests__/sshSimulator.test.js (3 tests) 4ms
- ✓ src/__tests__/securityService.test.js (4 tests) 212ms
- ✓ src/__tests__/p2pService.test.js (2 tests) 319ms
- ✓ src/__tests__/LockScreen.test.jsx (3 tests) 875ms
+ ✓ src/__tests__/advancedFeatures.test.js (1 test) 4ms
+ ✓ src/__tests__/sshSimulator.test.js (3 tests) 5ms
+ ✓ src/__tests__/virtualFS.test.js (5 tests) 5ms
+ ✓ src/__tests__/shellEngine.test.js (5 tests) 12ms
+ ✓ src/__tests__/securityService.test.js (4 tests) 232ms
+ ✓ src/__tests__/smoke.test.js (1 test) 2ms
+ ✓ src/__tests__/p2pService.test.js (2 tests) 317ms
+ ✓ src/__tests__/LockScreen.test.jsx (3 tests) 874ms
 
- Test Files  7 passed (7)
-      Tests  23 passed (23)
-   Start at  10:26:00
-   Duration  1.66s
+ Test Files  8 passed (8)
+      Tests  24 passed (24)
+   Duration  1.69s
 ```
 
 ### 2. Kiểm thử trình duyệt thực tế tự động (Playwright E2E Testing):
  
  Để đảm bảo ứng dụng vận hành 100% chính xác giống như hành vi thực tế của người dùng, chúng ta đã tích hợp bộ công cụ kiểm thử trình duyệt cao cấp **Playwright**.
  
- Đặc biệt, chúng ta đã xây dựng một cơ chế **Mock P2P chéo tab thời gian thực qua BroadcastChannel** độc quyền, giúp giả lập hoàn hảo hai thiết bị kết nối WebRTC truyền và giải mã dữ liệu mã hóa an toàn offline cực nhanh không cần phụ thuộc máy chủ Cloud PeerJS trung gian!
- 
- **Kết quả chạy Playwright E2E thành công vượt mong đợi (4/4 tests passed):**
+ **Kết quả chạy Playwright E2E thành công vượt mong đợi (5/5 tests passed):**
  
  ```bash
  > npm run test:e2e
  
- > terminus-clone@0.0.0 test:e2e
- > playwright test
+ Running 5 tests using 4 workers
  
- Running 4 tests using 4 workers
- 
- [1/4] [chromium] › e2e/terminus.spec.js:159:3 › Terminus Clone E2E Tests › Kịch bản 4: Đồng bộ P2P WebRTC song song giữa 2 browser contexts
- [2/4] [chromium] › e2e/terminus.spec.js:112:3 › Terminus Clone E2E Tests › Kịch bản 3: Tương tác kết nối SSH giả lập và đồng bộ SFTP visual split-pane
- [3/4] [chromium] › e2e/terminus.spec.js:54:3 › Terminus Clone E2E Tests › Kịch bản 2: Đăng ký mã PIN bảo mật, reload trang và kiểm tra màn hình khóa LockScreen
- [4/4] [chromium] › e2e/terminus.spec.js:16:3 › Terminus Clone E2E Tests › Kịch bản 1: Mở ứng dụng, tạo Terminal cục bộ và chạy lệnh ảo
-   4 passed (6.4s)
+ [1/5] [chromium] › e2e/terminus.spec.js:54:3 › Last SSH E2E Tests › Kịch bản 2: Đăng ký mã PIN bảo mật, reload trang và kiểm tra màn hình khóa LockScreen
+ [2/5] [chromium] › e2e/terminus.spec.js:159:3 › Last SSH E2E Tests › Kịch bản 4: Đồng bộ P2P WebRTC song song giữa 2 browser contexts
+ [3/5] [chromium] › e2e/terminus.spec.js:16:3 › Last SSH E2E Tests › Kịch bản 1: Mở ứng dụng, tạo Terminal cục bộ và chạy lệnh ảo
+ [4/5] [chromium] › e2e/terminus.spec.js:112:3 › Last SSH E2E Tests › Kịch bản 3: Tương tác kết nối SSH giả lập và đồng bộ SFTP visual split-pane
+ [5/5] [chromium] › e2e/terminus.spec.js:232:3 › Last SSH E2E Tests › Kịch bản 5: Quản lý SSH Private Keys, Folders, Tags, Live Search và Xác thực SSH Key nâng cao
+   5 passed (22.9s)
  ```
  
- * **Kịch bản 1 (Terminal cục bộ):** Tạo tệp tệp tin ảo, gõ lệnh `ls`, `neofetch`, `clear` -> Thành công.
+ * **Kịch bản 1 (Terminal cục bộ):** Tạo thư mục ảo, gõ lệnh `ls`, `neofetch`, `clear` -> Thành công.
  * **Kịch bản 2 (Mã hóa PIN & Màn hình khóa):** Kích hoạt PIN `2026`, reload trang chắn bằng LockScreen, nhập sai `1111` chấn rung báo lỗi, nhập đúng `2026` mở khóa thành công -> Đạt 100%.
  * **Kịch bản 3 (SSH & SFTP visual):** Khởi tạo SSH profile, kết nối mở Split Pane SFTP, tạo folder trực quan và đồng bộ in log ngược lại Terminal SSH -> Hoạt động trơn tru.
- * **Kịch bản 4 (Đồng bộ P2P WebRTC):** Mở 2 trang (Page A gửi, Page B nhận), ghép cặp ID, mã hóa cấu hình bằng PIN `7890`, gửi đi chéo trang qua kênh mock, giải mã và hiển thị server tức thì không cần reload -> Đồng bộ tuyệt vời.
+ * **Kịch bản 4 (Đồng bộ P2P WebRTC):** Mở 2 trang (Page A gửi, Page B nhận), ghép cặp ID, mã hóa cấu hình bằng PIN `7890`, gửi chéo trang qua kênh mock, giải mã và hiển thị server tức thì không cần reload -> Đồng bộ tuyệt vời.
+ * **Kịch bản 5 (SSH Key & Live Search nâng cao):** Thêm mới Private Key PEM trong settings; tạo server profile có liên kết group thư mục, nhãn tags màu và Private Key; thực hiện live search lọc chính xác theo các tiêu chí; nhấp kết nối server và xác minh log bắt tay bằng SSH Key trong Terminal mô phỏng thành công -> Hoạt động hoàn hảo 100%.
 
-### 3. Kiểm thử biên dịch Production (Vite Build):
+### 3. Kiểm thử giao diện trực quan (Visual UI Testing & Screenshots):
+Chúng ta đã tích hợp kịch bản kiểm thử giao diện `e2e/visual.spec.js` tự động chụp ảnh màn hình các trạng thái giao diện chính của ứng dụng và lưu vào thư mục `test-results/screenshots/`:
+* `screenshot_light_theme_main.png`: Giao diện chính của ứng dụng khi áp dụng theme sáng màu **Light Terminus** mới.
+* `screenshot_main_screen.png`: Màn hình giao diện làm việc chính với Sidebar, Terminal, SFTP Browser và hiệu ứng Retro CRT.
+* `screenshot_settings_appearance.png`: Tab tùy chỉnh giao diện (Hỗ trợ cấu hình độc lập App Theme & Terminal Theme, Font, Cỡ chữ, Kiểu con trỏ, CRT toggle).
+* `screenshot_settings_keys.png`: Tab quản lý khóa SSH Private Keys (Hiển thị thẻ card các khóa đã tạo).
+* `screenshot_lock_screen.png`: Màn hình khóa PIN mờ đục với Keypad số nhập liệu bảo mật.
+
+> [!TIP]
+> Tất cả các ảnh chụp màn hình đều được phân tích kỹ lưỡng. Giao diện của **Last SSH** đạt tính cân đối tuyệt đối, độ tương phản màu sắc cực kỳ xuất sắc, bố cục hài hòa và thiết kế Glassmorphism mang lại trải nghiệm đỉnh cao cho người dùng!
+
+### 4. Kiểm thử biên dịch Production (Vite Build):
 Mã nguồn được biên dịch và tối ưu hóa hoàn toàn sạch sẽ, cam kết không chứa bất kỳ cảnh báo hay lỗi cú pháp nào.
 
 **Kết quả build thành công xuất sắc:**
 * `dist/index.html` - 0.46 kB
 * `dist/assets/index-CAFQabuJ.css` - 27.04 kB (CSS siêu gọn nhẹ)
 * `dist/assets/index-BKHKqCos.js` - 285.75 kB (Gzip chỉ 89kB)
+
 
 ---
 

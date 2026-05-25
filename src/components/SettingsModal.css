@@ -212,3 +212,87 @@ input:checked + .switch-slider:before {
   opacity: 0;
   cursor: pointer;
 }
+
+/* SSH Private Keys tab styling */
+.key-setup-form {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.key-textarea {
+  font-family: 'Fira Code', monospace;
+  font-size: 11px;
+  letter-spacing: 0.2px;
+  line-height: 1.4;
+  white-space: pre;
+  resize: vertical;
+  background: rgba(0, 0, 0, 0.4) !important;
+}
+
+.no-keys-placeholder {
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 18px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed var(--border-color);
+  border-radius: 8px;
+}
+
+.keys-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.key-item-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.key-item-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--border-highlight);
+}
+
+.key-item-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.key-item-icon {
+  color: var(--accent);
+}
+
+.key-item-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.key-item-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.key-item-meta {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+

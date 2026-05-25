@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Lock, Unlock, Fingerprint, Delete } from 'lucide-react';
 import { securityService } from '../services/securityService.js';
 import './LockScreen.css';
@@ -12,23 +12,48 @@ export default function LockScreen({ onUnlockSuccess }) {
   const [shake, setShake] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  useEffect(() => {
-    // Kiểm tra xem vân tay đã được liên kết chưa
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const raw = window.localStorage.getItem('terminus_biometrics_credentials');
-      setHasBiometrics(!!raw);
-    }
-
-    // Tự động kích hoạt quét vân tay Touch ID khi mount nếu có hỗ trợ
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const raw = window.localStorage.getItem('terminus_biometrics_credentials');
-      if (raw) {
-        setTimeout(() => {
-          handleBiometricUnlock();
-        }, 300);
+  // Xác thực mở khóa bằng sinh trắc học Touch ID/Windows Hello
+  const handleBiometricUnlock = useCallback(async () => {
+    setErrorMsg('');
+    try {
+      const decryptedData = await securityService.unlockWithBiometrics();
+      
+      setSuccess(true);
+      setTimeout(() => {
+        onUnlockSuccess(decryptedData);
+      }, 500);
+    } catch (err) {
+      // Chỉ hiện lỗi khi người dùng chủ động nhấn hoặc quét thất bại thực sự
+      console.warn('Lỗi sinh trắc học:', err);
+      if (err.message && !err.message.includes('cancel') && !err.message.includes('abort')) {
+        setErrorMsg(err.message);
+        setShake(true);
+        setTimeout(() => setShake(false), 300);
       }
     }
-  }, []);
+  }, [onUnlockSuccess]);
+
+  useEffect(() => {
+    let timer;
+    const initLockScreen = async () => {
+      // Kiểm tra xem vân tay đã được liên kết chưa
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const raw = window.localStorage.getItem('terminus_biometrics_credentials');
+        setHasBiometrics(!!raw);
+        
+        // Tự động kích hoạt quét vân tay Touch ID khi mount nếu có hỗ trợ
+        if (raw) {
+          timer = setTimeout(() => {
+            handleBiometricUnlock();
+          }, 300);
+        }
+      }
+    };
+    initLockScreen();
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [handleBiometricUnlock]);
 
   // Xử lý khi nhấn nút số trên Keypad
   const handleNumberClick = (num) => {
@@ -66,6 +91,7 @@ export default function LockScreen({ onUnlockSuccess }) {
         onUnlockSuccess(decryptedData);
       }, 500);
     } catch (err) {
+      console.error(err);
       // Thất bại -> Rung màn hình và reset PIN
       setShake(true);
       setErrorMsg('Mã PIN không chính xác! Vui lòng thử lại.');
@@ -74,26 +100,7 @@ export default function LockScreen({ onUnlockSuccess }) {
     }
   };
 
-  // Xác thực mở khóa bằng sinh trắc học Touch ID/Windows Hello
-  const handleBiometricUnlock = async () => {
-    setErrorMsg('');
-    try {
-      const decryptedData = await securityService.unlockWithBiometrics();
-      
-      setSuccess(true);
-      setTimeout(() => {
-        onUnlockSuccess(decryptedData);
-      }, 500);
-    } catch (err) {
-      // Chỉ hiện lỗi khi người dùng chủ động nhấn hoặc quét thất bại thực sự
-      console.warn('Lỗi sinh trắc học:', err);
-      if (err.message && !err.message.includes('cancel') && !err.message.includes('abort')) {
-        setErrorMsg(err.message);
-        setShake(true);
-        setTimeout(() => setShake(false), 300);
-      }
-    }
-  };
+
 
   return (
     <div className="lockscreen-overlay">

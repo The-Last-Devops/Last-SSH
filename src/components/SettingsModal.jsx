@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Palette, 
   ShieldAlert, 
@@ -9,7 +9,9 @@ import {
   Upload, 
   Trash2,
   Lock,
-  Unlock
+  Unlock,
+  Key,
+  Plus
 } from 'lucide-react';
 import { securityService } from '../services/securityService.js';
 import { virtualFS } from '../services/virtualFS.js';
@@ -21,6 +23,9 @@ export default function SettingsModal({
   settings,
   onUpdateSettings,
   connections = [],
+  keys = [],
+  onAddKey,
+  onDeleteKey,
   onImportData,
   onResetData
 }) {
@@ -32,17 +37,22 @@ export default function SettingsModal({
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
 
+  // Form states cho Private Key
+  const [keyLabel, setKeyLabel] = useState('');
+  const [keyContent, setKeyContent] = useState('');
+  const [keyPassphrase, setKeyPassphrase] = useState('');
+
   useEffect(() => {
     if (isOpen) {
-      setHasPin(securityService.hasPIN());
-      checkBiometrics();
+      const initSecurity = async () => {
+        const pinActive = securityService.hasPIN();
+        const supported = await securityService.isBiometricsSupported();
+        setHasPin(pinActive);
+        setIsBiometricsAvailable(supported);
+      };
+      initSecurity();
     }
   }, [isOpen]);
-
-  const checkBiometrics = async () => {
-    const supported = await securityService.isBiometricsSupported();
-    setIsBiometricsAvailable(supported);
-  };
 
   if (!isOpen) return null;
 
@@ -62,7 +72,8 @@ export default function SettingsModal({
       // Đóng gói cấu trúc lưu trữ hiện tại dạng plain text vào payload ban đầu
       const initialPayload = {
         connections: connections,
-        settings: settings
+        settings: settings,
+        keys: keys
       };
       
       await securityService.setupPIN(newPin, initialPayload);
@@ -108,6 +119,7 @@ export default function SettingsModal({
         virtualFS: virtualFS.exportFS(),
         connections: connections,
         settings: settings,
+        keys: keys,
         exportedAt: new Date().toISOString(),
         version: '1.0.0'
       };
@@ -116,7 +128,7 @@ export default function SettingsModal({
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `terminus-web-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      link.download = `last-ssh-backup-${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -161,13 +173,34 @@ export default function SettingsModal({
     }
   };
 
+  // 7. Thêm mới Key
+  const handleKeySubmit = (e) => {
+    e.preventDefault();
+    if (!keyLabel.trim() || !keyContent.trim()) {
+      alert('Vui lòng điền nhãn và nội dung Private Key PEM!');
+      return;
+    }
+
+    onAddKey({
+      label: keyLabel.trim(),
+      keyContent: keyContent.trim(),
+      passphrase: keyPassphrase
+    });
+
+    setKeyLabel('');
+    setKeyContent('');
+    setKeyPassphrase('');
+    alert('Đã thêm SSH Private Key mới thành công!');
+  };
+
   // Danh sách themes hỗ trợ
   const themeList = [
     { name: 'Glass Aura', color: '#aa3bff', desc: 'Glassmorphism' },
     { name: 'Cyberpunk Neon', color: '#ff007f', desc: 'Neon Cyberpunk' },
     { name: 'One Dark Pro', color: '#61afef', desc: 'Professional' },
     { name: 'Dracula', color: '#bd93f9', desc: 'Huyền bí dark' },
-    { name: 'Retro Amber', color: '#ffb000', desc: 'CRT Hoài cổ' }
+    { name: 'Retro Amber', color: '#ffb000', desc: 'CRT Hoài cổ' },
+    { name: 'Light Terminus', color: '#ff5722', desc: 'Theme sáng Terminus' }
   ];
 
   return (
@@ -187,13 +220,23 @@ export default function SettingsModal({
           <button 
             className={`settings-tab-btn ${activeTab === 'appearance' ? 'active' : ''}`}
             onClick={() => setActiveTab('appearance')}
+            id="tab-settings-appearance"
           >
             <Palette size={14} />
             Appearance
           </button>
           <button 
+            className={`settings-tab-btn ${activeTab === 'keys' ? 'active' : ''}`}
+            onClick={() => setActiveTab('keys')}
+            id="tab-settings-keys"
+          >
+            <Key size={14} />
+            Private Keys
+          </button>
+          <button 
             className={`settings-tab-btn ${activeTab === 'security' ? 'active' : ''}`}
             onClick={() => setActiveTab('security')}
+            id="tab-settings-security"
           >
             <Lock size={14} />
             Security
@@ -201,6 +244,7 @@ export default function SettingsModal({
           <button 
             className={`settings-tab-btn ${activeTab === 'data' ? 'active' : ''}`}
             onClick={() => setActiveTab('data')}
+            id="tab-settings-data"
           >
             <Database size={14} />
             Backup & Data
@@ -213,18 +257,36 @@ export default function SettingsModal({
           {/* TAB 1: Appearance */}
           {activeTab === 'appearance' && (
             <div className="settings-section">
-              {/* Theme Picker */}
+              {/* Tách biệt Theme Pickers */}
               <div className="form-group">
-                <label className="form-label">Color Theme</label>
+                <label className="form-label" style={{ color: 'var(--accent)', fontWeight: 600 }}>APPLICATION THEME</label>
                 <div className="theme-grid">
                   {themeList.map(t => (
                     <div 
-                      key={t.name}
-                      className={`theme-card ${settings.theme === t.name ? 'active' : ''}`}
-                      onClick={() => onUpdateSettings({ theme: t.name })}
+                      key={`app-${t.name}`}
+                      className={`theme-card ${settings.appTheme === t.name ? 'active' : ''}`}
+                      onClick={() => onUpdateSettings({ appTheme: t.name })}
+                      style={{ padding: '8px 10px', minHeight: '75px', justifyContent: 'center' }}
                     >
-                      <div className="theme-color-preview" style={{ backgroundColor: t.color }} />
-                      <span className="theme-card-title">{t.name}</span>
+                      <div className="theme-color-preview" style={{ backgroundColor: t.color, width: '14px', height: '14px' }} />
+                      <span className="theme-card-title" style={{ fontSize: '10.5px' }}>{t.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginTop: '16px' }}>
+                <label className="form-label" style={{ color: 'var(--accent)', fontWeight: 600 }}>TERMINAL WORKSPACE THEME</label>
+                <div className="theme-grid">
+                  {themeList.map(t => (
+                    <div 
+                      key={`term-${t.name}`}
+                      className={`theme-card ${settings.terminalTheme === t.name ? 'active' : ''}`}
+                      onClick={() => onUpdateSettings({ terminalTheme: t.name })}
+                      style={{ padding: '8px 10px', minHeight: '75px', justifyContent: 'center' }}
+                    >
+                      <div className="theme-color-preview" style={{ backgroundColor: t.color, width: '14px', height: '14px' }} />
+                      <span className="theme-card-title" style={{ fontSize: '10.5px' }}>{t.name}</span>
                     </div>
                   ))}
                 </div>
@@ -294,7 +356,98 @@ export default function SettingsModal({
             </div>
           )}
 
-          {/* TAB 2: Security */}
+          {/* TAB 2: SSH Private Keys */}
+          {activeTab === 'keys' && (
+            <div className="settings-section">
+              {/* Form thêm mới Key */}
+              <form onSubmit={handleKeySubmit} className="key-setup-form">
+                <span className="form-title" style={{ fontSize: '11.5px', color: 'var(--accent)', fontWeight: 600 }}>ADD NEW PRIVATE KEY</span>
+                <div className="form-group">
+                  <label className="form-label">Key Label / Name</label>
+                  <input 
+                    type="text" 
+                    className="glass-input" 
+                    value={keyLabel}
+                    onChange={(e) => setKeyLabel(e.target.value)}
+                    placeholder="e.g. Production AWS Key"
+                    required
+                    id="input-key-label"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Private Key Content (PEM Format)</label>
+                  <textarea 
+                    className="glass-input key-textarea" 
+                    value={keyContent}
+                    onChange={(e) => setKeyContent(e.target.value)}
+                    placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;MIIEogIBAAKCAQEA0y6...&#10;-----END RSA PRIVATE KEY-----"
+                    rows="4"
+                    required
+                    id="input-key-content"
+                  />
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Passphrase / Password (Optional)</label>
+                    <input 
+                      type="password" 
+                      className="glass-input" 
+                      value={keyPassphrase}
+                      onChange={(e) => setKeyPassphrase(e.target.value)}
+                      placeholder="Leave blank if none"
+                      id="input-key-passphrase"
+                    />
+                  </div>
+                </div>
+
+                <button type="submit" className="glass-button active" style={{ display: 'flex', gap: '6px', width: 'max-content' }} id="btn-save-key">
+                  <Plus size={14} />
+                  Save Private Key
+                </button>
+              </form>
+
+              {/* Danh sách các Key hiện có */}
+              <div className="keys-list-container" style={{ marginTop: '10px' }}>
+                <label className="form-label">SAVED KEYS ({keys.length})</label>
+                {keys.length === 0 ? (
+                  <div className="no-keys-placeholder">
+                    No keys found. Add your first SSH private key using the form above.
+                  </div>
+                ) : (
+                  <div className="keys-grid">
+                    {keys.map(k => (
+                      <div key={k.id} className="key-item-card">
+                        <div className="key-item-info">
+                          <Key size={15} className="key-item-icon" />
+                          <div className="key-item-details">
+                            <span className="key-item-label">{k.label}</span>
+                            <span className="key-item-meta">PEM RSA Key ({(k.keyContent || '').length} chars)</span>
+                          </div>
+                        </div>
+                        <button 
+                          type="button" 
+                          className="action-btn delete-btn" 
+                          onClick={() => {
+                            if (confirm(`Bạn chắc chắn muốn xóa khóa '${k.label}'? Các server liên kết với khóa này sẽ chuyển sang dùng password.`)) {
+                              onDeleteKey(k.id);
+                            }
+                          }}
+                          title="Delete Key"
+                          id={`btn-delete-key-${k.id}`}
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: Security */}
           {activeTab === 'security' && (
             <div className="settings-section">
               {hasPin ? (
@@ -378,7 +531,7 @@ export default function SettingsModal({
             </div>
           )}
 
-          {/* TAB 3: Data Management */}
+          {/* TAB 4: Data Management */}
           {activeTab === 'data' && (
             <div className="settings-section">
               <div className="settings-toggle-row">

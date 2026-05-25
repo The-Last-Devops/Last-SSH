@@ -229,4 +229,104 @@ test.describe('Last SSH E2E Tests', () => {
     await context.close();
   });
 
+  test('Kịch bản 5: Quản lý SSH Private Keys, Folders, Tags, Live Search và Xác thực SSH Key nâng cao', async ({ page }) => {
+    // 1. Thêm một SSH Private Key mới qua Settings Modal
+    const btnSettings = page.locator('#btn-settings');
+    await btnSettings.click();
+    await page.waitForSelector('.modal-content');
+
+    // Chuyển sang Tab Private Keys
+    const tabKeys = page.locator('#tab-settings-keys');
+    await tabKeys.click();
+    await page.waitForSelector('.key-setup-form');
+
+    // Điền thông tin khóa
+    await page.locator('#input-key-label').fill('E2E Advanced Key');
+    await page.locator('#input-key-content').fill('-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtcnNh\n-----END OPENSSH PRIVATE KEY-----');
+    await page.locator('#input-key-passphrase').fill('e2e-passphrase');
+
+    // Đăng ký Dialog handler để tự động bấm OK khi thêm key thành công
+    page.once('dialog', async dialog => {
+      expect(dialog.message()).toContain('thêm SSH Private Key mới thành công');
+      await dialog.accept();
+    });
+    
+    // Lưu khóa
+    await page.locator('#btn-save-key').click();
+
+    // Chờ khóa hiển thị trong danh sách card
+    await page.waitForSelector('.key-item-card:has-text("E2E Advanced Key")');
+
+    // Đóng Settings Modal
+    await page.locator('.modal-close-btn').click();
+
+    // 2. Tạo SSH Connection Profile mới liên kết với Folder, Tags và Private Key
+    const btnAddConn = page.locator('#btn-add-conn');
+    await btnAddConn.click();
+    await page.waitForSelector('.connection-form-container');
+
+    // Điền form kết nối
+    await page.locator('input[placeholder="e.g. Production Server"]').fill('E2E Foldered Server');
+    await page.locator('input[placeholder="e.g. 192.168.1.100"]').fill('172.16.0.5');
+    await page.locator('#input-conn-username').fill('e2e-user');
+    await page.locator('#input-conn-password').fill(''); // Bỏ trống mật khẩu để dùng Key
+    await page.locator('#input-conn-group').fill('E2E Foldered Group');
+    await page.locator('#input-conn-tags').fill('prod, secure, gateway');
+    
+    // Chọn Private Key từ dropdown
+    await page.locator('#select-conn-key').selectOption({ label: 'E2E Advanced Key' });
+
+    // Lưu kết nối
+    await page.locator('button[type="submit"]:has-text("Save")').click();
+
+    // Xác nhận Folder Group được hiển thị trong Sidebar
+    const groupHeader = page.locator('.group-folder-header:has-text("E2E Foldered Group")');
+    await expect(groupHeader).toBeVisible();
+
+    // Xác nhận kết nối hiển thị bên trong nhóm
+    const connItem = page.locator('.connection-item:has-text("E2E Foldered Server")');
+    await expect(connItem).toBeVisible();
+
+    // Kiểm tra Tags badge hiển thị chính xác
+    const tagProd = page.locator('.tag-badge:has-text("prod")');
+    await expect(tagProd).toBeVisible();
+
+    // 3. Kiểm thử tính năng Live Search
+    const searchInput = page.locator('#sidebar-search-input');
+    await expect(searchInput).toBeVisible();
+
+    // A. Tìm kiếm theo tên nhóm "Foldered"
+    await searchInput.fill('Foldered');
+    await expect(groupHeader).toBeVisible();
+    await expect(connItem).toBeVisible();
+
+    // B. Tìm kiếm theo tag "secure"
+    await searchInput.fill('secure');
+    await expect(connItem).toBeVisible();
+
+    // C. Tìm kiếm với từ khóa không khớp
+    await searchInput.fill('nonexistent-keyword');
+    await expect(groupHeader).not.toBeVisible();
+    await expect(connItem).not.toBeVisible();
+
+    // D. Clear search bằng nút
+    await page.locator('.clear-search-btn').click();
+    await expect(searchInput).toHaveValue('');
+    await expect(groupHeader).toBeVisible();
+    await expect(connItem).toBeVisible();
+
+    // 4. Click kết nối SSH Server, kiểm thử log xác thực bằng Private Key trong Terminal
+    await connItem.click();
+
+    // Chờ panel SFTP visual và Terminal Tab mở ra
+    await page.waitForSelector('.sftp-pane');
+    
+    // Đảm bảo terminal history hiển thị các log xác thực bằng Private Key
+    const terminalHistory = page.locator('.terminal-history');
+    await expect(terminalHistory).toContainText('[SSH] Exchanging key fingerprints');
+    await expect(terminalHistory).toContainText('Trying private key: E2E Advanced Key');
+    await expect(terminalHistory).toContainText('Key authentication succeeded. Access granted.');
+  });
+
 });
+

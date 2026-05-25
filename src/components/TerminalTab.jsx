@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { shellEngine } from '../services/shellEngine.js';
 import { sshSimulator } from '../services/sshSimulator.js';
 import './TerminalTab.css';
@@ -7,6 +7,7 @@ import './TerminalTab.css';
 function parseAnsi(text) {
   if (typeof text !== 'string') return text;
   
+  // eslint-disable-next-line no-control-regex
   const regex = /\x1b\[([0-9;]+)m/g;
   let match;
   let lastIndex = 0;
@@ -52,7 +53,6 @@ export default function TerminalTab({
   tab,
   settings,
   onUpdateTab,
-  onCloseTab,
   onSwitchToSFTP
 }) {
   const [inputValue, setInputValue] = useState('');
@@ -162,7 +162,7 @@ export default function TerminalTab({
 
       } else {
         // Lệnh Local Shell
-        const res = shellEngine.execute(tab.currentPath, cmd, settings.theme);
+        const res = shellEngine.execute(tab.currentPath, cmd, settings.terminalTheme || settings.appTheme || 'Glass Aura');
 
         if (res.clear) {
           onUpdateTab(tab.id, {
@@ -290,9 +290,11 @@ export default function TerminalTab({
     }
   };
 
+  const terminalThemeClass = `theme-${(settings.terminalTheme || 'Glass Aura').toLowerCase().replace(/ /g, '-')}`;
+
   return (
     <div 
-      className={`terminal-container ${settings.crtEnabled ? 'crt-effect crt-flicker' : ''} ${getFontFamilyClass()}`}
+      className={`terminal-container ${terminalThemeClass} ${settings.crtEnabled ? 'crt-effect crt-flicker' : ''} ${getFontFamilyClass()}`}
       onClick={handleContainerClick}
       ref={containerRef}
       style={{ fontSize: `${settings.fontSize || 14}px` }}

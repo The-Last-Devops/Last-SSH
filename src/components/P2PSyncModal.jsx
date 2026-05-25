@@ -1,9 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
   Network, 
-  Smartphone, 
-  Tv, 
   RefreshCw, 
   FolderSync, 
   CheckCircle, 
@@ -33,15 +31,6 @@ export default function P2PSyncModal({
   // PIN bảo mật cho đồng bộ
   const [syncPin, setSyncPin] = useState('');
   const [decryptPin, setDecryptPin] = useState('');
-
-  useEffect(() => {
-    if (isOpen) {
-      startPeer();
-    } else {
-      p2pService.disconnect();
-      resetStates();
-    }
-  }, [isOpen]);
 
   const resetStates = () => {
     setPeerId('');
@@ -84,6 +73,18 @@ export default function P2PSyncModal({
 
     await p2pService.initPeer();
   };
+
+  useEffect(() => {
+    const init = async () => {
+      if (isOpen) {
+        await startPeer();
+      } else {
+        p2pService.disconnect();
+        resetStates();
+      }
+    };
+    init();
+  }, [isOpen]);
 
   // Thiết lập kết nối
   const handleConnect = async (e) => {
@@ -128,6 +129,7 @@ export default function P2PSyncModal({
       alert('Đồng bộ hóa dữ liệu thành công! Ứng dụng của bạn đã được cập nhật.');
       onClose();
     } catch (err) {
+      console.error(err);
       alert('Giải mã thất bại! Mã PIN không khớp, vui lòng thử lại.');
     }
   };

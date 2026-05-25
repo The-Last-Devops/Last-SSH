@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { Network, Folder } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar.jsx';
 import TabsBar from './components/TabsBar.jsx';
 import TerminalTab from './components/TerminalTab.jsx';
@@ -15,7 +14,8 @@ import { sshSimulator } from './services/sshSimulator.js';
 import './App.css';
 
 const DEFAULT_SETTINGS = {
-  theme: 'Glass Aura',
+  appTheme: 'Glass Aura',
+  terminalTheme: 'Glass Aura',
   fontFamily: 'Fira Code',
   fontSize: 14,
   cursorStyle: 'block',
@@ -24,16 +24,22 @@ const DEFAULT_SETTINGS = {
 
 const STORAGE_KEYS = {
   SETTINGS: 'terminus_settings',
-  CONNECTIONS_PLAIN: 'terminus_connections_plain'
+  CONNECTIONS_PLAIN: 'terminus_connections_plain',
+  KEYS_PLAIN: 'terminus_keys_plain'
+};
+
+const generateUniqueId = (prefix) => {
+  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
 };
 
 export default function App() {
   // 1. Trạng thái Khóa bảo mật (Security State)
   const [isLocked, setIsLocked] = useState(false);
 
-  // 2. Cài đặt và Kết nối (App Global Settings & Connections)
+  // 2. Cài đặt, Kết nối và Khóa Private Keys (App Global States)
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [connections, setConnections] = useState([]);
+  const [keys, setKeys] = useState([]);
 
   // 3. Quản lý Đa Tab (Tab Management)
   const [tabs, setTabs] = useState([]);
@@ -44,65 +50,22 @@ export default function App() {
   const [isP2PSyncOpen, setIsP2PSyncOpen] = useState(false);
   const [isSftpOpenMap, setIsSftpOpenMap] = useState({}); // tabId -> boolean
 
-  // -------------------------------------------------------------
-  // BOOTSTRAP INITIALIZATION
-  // -------------------------------------------------------------
+
+
   useEffect(() => {
-    // Kiểm tra xem ứng dụng có bị khóa mã PIN không
-    const pinEnabled = securityService.hasPIN();
-    setIsLocked(pinEnabled);
-
-    // Tải cấu hình App (Settings)
-    const storedSettings = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-    if (storedSettings) {
-      try {
-        setSettings(JSON.parse(storedSettings));
-      } catch (e) {
-        console.error('Lỗi đọc settings:', e);
-      }
-    }
-
-    if (!pinEnabled) {
-      // Nếu KHÔNG có mã PIN -> Tải thẳng các connections từ plain storage
-      const storedConns = localStorage.getItem(STORAGE_KEYS.CONNECTIONS_PLAIN);
-      if (storedConns) {
-        try {
-          setConnections(JSON.parse(storedConns));
-        } catch (e) {
-          console.error('Lỗi đọc connections plain:', e);
-        }
-      }
-    }
-
-    // Khởi tạo Tab Local đầu tiên
-    openNewLocalTab();
-
-    // Lắng nghe sự kiện đổi theme nhanh qua console 'theme <name>'
-    const handleThemeCmd = (e) => {
-      const themeName = e.detail;
-      handleUpdateSettings({ theme: themeName });
-    };
-    window.addEventListener('change-theme-cmd', handleThemeCmd);
-    return () => {
-      window.removeEventListener('change-theme-cmd', handleThemeCmd);
-    };
-  }, []);
-
-  // Áp dụng class theme lên body của tài liệu để CSS cập nhật màu sắc biến toàn cục
-  useEffect(() => {
-    const themeClass = `theme-${settings.theme.toLowerCase().replace(/ /g, '-')}`;
+    const themeClass = `theme-${(settings.appTheme || 'Glass Aura').toLowerCase().replace(/ /g, '-')}`;
     
     // Xóa tất cả các class theme cũ
     document.body.className = '';
     // Thêm theme class mới
     document.body.classList.add(themeClass);
-  }, [settings.theme]);
+  }, [settings.appTheme]);
 
   // -------------------------------------------------------------
   // TÁC VỤ QUẢN LÝ TAB (TAB SYSTEM WORKFLOW)
   // -------------------------------------------------------------
   const openNewLocalTab = () => {
-    const tabId = 'tab-local-' + Date.now();
+    const tabId = generateUniqueId('tab-local');
     const newTab = {
       id: tabId,
       title: 'Local terminal',
@@ -155,10 +118,10 @@ export default function App() {
   // TÁC VỤ KẾT NỐI SSH & ĐỒNG BỘ SFTP (SSH & SFTP INTERACTION)
   // -------------------------------------------------------------
   const handleConnectSSH = (profile) => {
-    const tabId = 'tab-ssh-' + Date.now();
+    const tabId = generateUniqueId('tab-ssh');
     
     // Tạo phiên SSH mô phỏng
-    const session = sshSimulator.createSession(tabId, profile);
+    const session = sshSimulator.createSession(tabId, profile, keys);
 
     const initialHistory = [
       { type: 'system', text: `\r\nStarting SSH connection to ${profile.label}...` }
@@ -220,14 +183,15 @@ export default function App() {
     if (securityService.hasPIN() && securityService.isUnlocked) {
       securityService.saveSecureData({
         connections: connections,
-        settings: updated
+        settings: updated,
+        keys: keys
       }).catch(e => console.error('Lỗi đồng bộ mã hóa settings:', e));
     }
   };
 
   // Thêm kết nối SSH mới
   const handleAddConnection = async (newProfile) => {
-    const profile = { ...newProfile, id: 'conn-' + Date.now() };
+    const profile = { ...newProfile, id: generateUniqueId('conn') };
     const updated = [...connections, profile];
     setConnections(updated);
 
@@ -257,7 +221,8 @@ export default function App() {
         try {
           await securityService.saveSecureData({
             connections: connectionsList,
-            settings: settings
+            settings: settings,
+            keys: keys
           });
         } catch (e) {
           console.error('Không thể đồng bộ mã hóa connections:', e);
@@ -265,6 +230,53 @@ export default function App() {
       }
     } else {
       localStorage.setItem(STORAGE_KEYS.CONNECTIONS_PLAIN, JSON.stringify(connectionsList));
+    }
+  };
+
+  // -------------------------------------------------------------
+  // TÁC VỤ QUẢN LÝ SSH PRIVATE KEYS (SSH PRIVATE KEYS WORKFLOW)
+  // -------------------------------------------------------------
+  const handleAddKey = async (newKey) => {
+    const keyProfile = { ...newKey, id: generateUniqueId('key') };
+    const updated = [...keys, keyProfile];
+    setKeys(updated);
+    await saveKeysState(updated);
+  };
+
+  const handleEditKey = async (id, updatedKey) => {
+    const updated = keys.map(k => k.id === id ? { ...k, ...updatedKey } : k);
+    setKeys(updated);
+    await saveKeysState(updated);
+  };
+
+  const handleDeleteKey = async (id) => {
+    // Xóa liên kết khóa ở các connection profile
+    const updatedConns = connections.map(c => c.keyId === id ? { ...c, keyId: '' } : c);
+    if (JSON.stringify(updatedConns) !== JSON.stringify(connections)) {
+      setConnections(updatedConns);
+      await saveConnectionsState(updatedConns);
+    }
+
+    const updated = keys.filter(k => k.id !== id);
+    setKeys(updated);
+    await saveKeysState(updated);
+  };
+
+  const saveKeysState = async (keysList) => {
+    if (securityService.hasPIN()) {
+      if (securityService.isUnlocked) {
+        try {
+          await securityService.saveSecureData({
+            connections: connections,
+            settings: settings,
+            keys: keysList
+          });
+        } catch (e) {
+          console.error('Không thể đồng bộ mã hóa keys:', e);
+        }
+      }
+    } else {
+      localStorage.setItem(STORAGE_KEYS.KEYS_PLAIN, JSON.stringify(keysList));
     }
   };
 
@@ -283,6 +295,9 @@ export default function App() {
     if (decryptedPayload.settings) {
       setSettings(prev => ({ ...prev, ...decryptedPayload.settings }));
     }
+    if (decryptedPayload.keys) {
+      setKeys(decryptedPayload.keys);
+    }
   };
 
   // Khôi phục dữ liệu từ Import JSON hoặc P2P Sync
@@ -300,12 +315,20 @@ export default function App() {
       setSettings(prev => ({ ...prev, ...importedData.settings }));
       localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(importedData.settings));
     }
+    // 4. Cập nhật Keys
+    if (importedData.keys) {
+      setKeys(importedData.keys);
+      if (!securityService.hasPIN()) {
+        localStorage.setItem(STORAGE_KEYS.KEYS_PLAIN, JSON.stringify(importedData.keys));
+      }
+    }
 
     // Nếu đã kích hoạt PIN, mã hóa ghi đè toàn bộ dữ liệu mới nhận
     if (securityService.hasPIN() && securityService.isUnlocked) {
       securityService.saveSecureData({
         connections: importedData.connections || connections,
-        settings: importedData.settings || settings
+        settings: importedData.settings || settings,
+        keys: importedData.keys || keys
       }).catch(e => console.error('Lỗi mã hóa dữ liệu import:', e));
     }
 
@@ -327,12 +350,14 @@ export default function App() {
     // 2. Xóa các lưu trữ cục bộ
     localStorage.removeItem(STORAGE_KEYS.SETTINGS);
     localStorage.removeItem(STORAGE_KEYS.CONNECTIONS_PLAIN);
+    localStorage.removeItem(STORAGE_KEYS.KEYS_PLAIN);
     // 3. Reset security
     securityService.resetSecurity();
 
     // 4. Reset React State
     setSettings(DEFAULT_SETTINGS);
     setConnections([]);
+    setKeys([]);
     setIsLocked(false);
     setIsSftpOpenMap({});
     
@@ -340,6 +365,70 @@ export default function App() {
     setTabs([]);
     openNewLocalTab();
   };
+
+  // -------------------------------------------------------------
+  // BOOTSTRAP INITIALIZATION
+  // -------------------------------------------------------------
+  useEffect(() => {
+    const bootstrap = async () => {
+      // Kiểm tra xem ứng dụng có bị khóa mã PIN không
+      const pinEnabled = securityService.hasPIN();
+      setIsLocked(pinEnabled);
+
+      // Tải cấu hình App (Settings)
+      const storedSettings = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+      if (storedSettings) {
+        try {
+          const parsed = JSON.parse(storedSettings);
+          // Tương thích ngược: Nếu có settings.theme cũ, gán sang appTheme và terminalTheme
+          if (parsed.theme && !parsed.appTheme) {
+            parsed.appTheme = parsed.theme;
+            parsed.terminalTheme = parsed.theme;
+          }
+          setSettings({ ...DEFAULT_SETTINGS, ...parsed });
+        } catch (e) {
+          console.error('Lỗi đọc settings:', e);
+        }
+      }
+
+      if (!pinEnabled) {
+        // Nếu KHÔNG có mã PIN -> Tải thẳng các connections từ plain storage
+        const storedConns = localStorage.getItem(STORAGE_KEYS.CONNECTIONS_PLAIN);
+        if (storedConns) {
+          try {
+            setConnections(JSON.parse(storedConns));
+          } catch (e) {
+            console.error('Lỗi đọc connections plain:', e);
+          }
+        }
+
+        // Tải Private Keys plain
+        const storedKeys = localStorage.getItem(STORAGE_KEYS.KEYS_PLAIN);
+        if (storedKeys) {
+          try {
+            setKeys(JSON.parse(storedKeys));
+          } catch (e) {
+            console.error('Lỗi đọc keys plain:', e);
+          }
+        }
+      }
+
+      // Khởi tạo Tab Local đầu tiên
+      openNewLocalTab();
+    };
+    bootstrap();
+
+    // Lắng nghe sự kiện đổi theme nhanh qua console 'theme <name>'
+    const handleThemeCmd = (e) => {
+      const themeName = e.detail;
+      handleUpdateSettings({ appTheme: themeName, terminalTheme: themeName });
+    };
+    window.addEventListener('change-theme-cmd', handleThemeCmd);
+    return () => {
+      window.removeEventListener('change-theme-cmd', handleThemeCmd);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const activeTab = tabs.find(t => t.id === activeTabId);
   const isSftpOpen = activeTabId && isSftpOpenMap[activeTabId] && activeTab && activeTab.type === 'ssh';
@@ -357,6 +446,7 @@ export default function App() {
           {/* Thanh bên trái: Sidebar - Connection Manager */}
           <Sidebar 
             connections={connections}
+            keys={keys}
             onAddConnection={handleAddConnection}
             onEditConnection={handleEditConnection}
             onDeleteConnection={handleDeleteConnection}
@@ -427,6 +517,10 @@ export default function App() {
         settings={settings}
         onUpdateSettings={handleUpdateSettings}
         connections={connections}
+        keys={keys}
+        onAddKey={handleAddKey}
+        onEditKey={handleEditKey}
+        onDeleteKey={handleDeleteKey}
         onImportData={handleImportRestore}
         onResetData={handleFactoryResetData}
       />

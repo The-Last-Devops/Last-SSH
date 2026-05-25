@@ -90,7 +90,7 @@ class SSHSimulator {
   }
 
   // Khởi tạo một phiên kết nối SSH mới
-  createSession(tabId, connectionProfile) {
+  createSession(tabId, connectionProfile, keysList = []) {
     const username = connectionProfile.username || 'ubuntu';
     const host = connectionProfile.host || '127.0.0.1';
     const port = connectionProfile.port || '22';
@@ -98,6 +98,36 @@ class SSHSimulator {
     // Sinh cấu trúc file riêng cho mỗi session
     const remoteFS = createRemoteDefaultFS(username);
     const defaultPath = `/home/${username}`;
+
+    // Tìm kiếm xem có khóa riêng tư tương ứng được liên kết không
+    const linkedKey = keysList.find(k => k.id === connectionProfile.keyId);
+
+    const logs = [
+      `\r\x1b[1;33mConnecting to ${username}@${host}:${port}...\x1b[0m`,
+      `\r\x1b[1;30m[SSH] Exchanging key fingerprints...\x1b[0m`
+    ];
+
+    if (linkedKey) {
+      logs.push(
+        `\r\x1b[1;30m[SSH] Trying private key: ${linkedKey.label}...\x1b[0m`,
+        `\r\x1b[1;30m[SSH] Authenticating with public key signature...\x1b[0m`,
+        `\r\x1b[1;32m[SSH] Key authentication succeeded. Access granted.\x1b[0m`
+      );
+    } else {
+      logs.push(
+        `\r\x1b[1;30m[SSH] Sending password credentials...\x1b[0m`,
+        `\r\x1b[1;32m[SSH] Connection established. Encryption AES-256-GCM. Ready.\x1b[0m`
+      );
+    }
+
+    logs.push(
+      `\r\nWelcome to Last SSH Simulated Ubuntu 22.04.4 LTS (GNU/Linux 5.15.0-generic)`,
+      `\r * Documentation: https://help.ubuntu.com`,
+      `\r * Management: https://landscape.canonical.com`,
+      `\r * Support: https://ubuntu.com/advantage`,
+      `\r\nLast login: ${new Date().toUTCString()} from local-proxy`,
+      `\r${username}@${host}:${defaultPath} $ `
+    );
 
     this.sessions[tabId] = {
       tabId,
@@ -107,18 +137,7 @@ class SSHSimulator {
       port,
       currentPath: defaultPath,
       fs: remoteFS,
-      logs: [
-        `\r\x1b[1;33mConnecting to ${username}@${host}:${port}...\x1b[0m`,
-        `\r\x1b[1;30m[SSH] Exchanging key fingerprints...\x1b[0m`,
-        `\r\x1b[1;30m[SSH] Sending credentials...\x1b[0m`,
-        `\r\x1b[1;32m[SSH] Connection established. Encryption AES-256-GCM. Ready.\x1b[0m`,
-        `\r\nWelcome to Terminus Simulated Ubuntu 22.04.4 LTS (GNU/Linux 5.15.0-generic)`,
-        `\r * Documentation: https://help.ubuntu.com`,
-        `\r * Management: https://landscape.canonical.com`,
-        `\r * Support: https://ubuntu.com/advantage`,
-        `\r\nLast login: ${new Date().toUTCString()} from local-proxy`,
-        `\r${username}@${host}:${defaultPath} $ `
-      ]
+      logs: logs
     };
 
     return this.sessions[tabId];

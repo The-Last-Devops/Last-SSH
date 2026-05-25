@@ -101,13 +101,16 @@
 .ansi-magenta { color: var(--term-magenta); }
 .ansi-white { color: var(--text-bright); }
 
-/* Theme custom glow enhancements */
-.theme-cyberpunk .terminal-line.type-input {
+.theme-cyberpunk.terminal-container .terminal-line.type-input {
   text-shadow: 0 0 5px rgba(0, 240, 255, 0.5);
 }
 
-.theme-retro-amber .terminal-container {
+.theme-retro-amber.terminal-container {
   text-shadow: 0 0 4px rgba(255, 176, 0, 0.7);
+}
+
+.theme-light-terminus.terminal-container {
+  text-shadow: none; /* Đảm bảo chữ hiển thị sắc nét nhất trên nền sáng */
 }
 
 /* CRT Scanlines overlays */

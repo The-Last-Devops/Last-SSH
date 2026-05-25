@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Terminal, Globe, Plus, X } from 'lucide-react';
 import './TabsBar.css';
 
