@@ -26,7 +26,7 @@ class P2PService {
     this.disconnect();
 
     // Kiểm tra môi trường chạy (Thêm window.__e2e__ cho E2E Testing)
-    if (typeof window === 'undefined' || process.env.NODE_ENV === 'test' || (typeof window !== 'undefined' && window.__e2e__)) {
+    if (typeof window === 'undefined' || (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.MODE === 'test') || (typeof window !== 'undefined' && window.__e2e__)) {
       this.isMock = true;
       this.peerId = customId || 'mock-peer-' + Math.floor(1000 + Math.random() * 9000);
       
@@ -196,20 +196,20 @@ class P2PService {
           sender: this.peerId,
           target: this.targetPeerId
         });
-      } catch (e) {}
+      } catch { /* ignore */ }
     }
 
     if (this.connection) {
-      try { this.connection.close(); } catch(e) {}
+      try { this.connection.close(); } catch { /* ignore */ }
       this.connection = null;
     }
     if (this.peer) {
-      try { this.peer.destroy(); } catch(e) {}
+      try { this.peer.destroy(); } catch { /* ignore */ }
       this.peer = null;
     }
 
     if (this.mockChannel) {
-      try { this.mockChannel.close(); } catch(e) {}
+      try { this.mockChannel.close(); } catch { /* ignore */ }
       this.mockChannel = null;
     }
 
@@ -265,7 +265,7 @@ class P2PService {
       return true;
     } catch (e) {
       console.error('Lỗi khi gửi payload P2P:', e);
-      throw new Error('Không thể mã hóa hoặc gửi dữ liệu: ' + e.message);
+      throw new Error('Không thể mã hóa hoặc gửi dữ liệu: ' + e.message, { cause: e });
     }
   }
 
@@ -305,7 +305,7 @@ class P2PService {
         settings: data.settings || {}
       };
     } catch (e) {
-      throw new Error('Giải mã dữ liệu đồng bộ thất bại. Mã PIN không khớp!');
+      throw new Error('Giải mã dữ liệu đồng bộ thất bại. Mã PIN không khớp!', { cause: e });
     }
   }
 }

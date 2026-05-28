@@ -68,6 +68,7 @@ export default function HostsDashboard({
   const [hostPassword, setHostPassword] = useState('');
   const [hostTags, setHostTags] = useState('');
   const [hostKeyId, setHostKeyId] = useState('');
+  const [hostOpenWithSFTP, setHostOpenWithSFTP] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   // Group Dropdown States (tương thích E2E test Folder Group)
@@ -148,6 +149,7 @@ export default function HostsDashboard({
     setHostTags((host.tags || []).join(', '));
     setHostKeyId(host.keyId || '');
     setHostIdentityId(host.identityId || '');
+    setHostOpenWithSFTP(!!host.openWithSFTP);
     
     setIsPaneOpen(true);
   };
@@ -170,6 +172,7 @@ export default function HostsDashboard({
     setHostTags('');
     setHostKeyId('');
     setHostIdentityId('');
+    setHostOpenWithSFTP(false);
     
     setIsPaneOpen(true);
   };
@@ -204,7 +207,8 @@ export default function HostsDashboard({
       tags: tagsArray,
       tagColor: 'var(--accent)',
       keyId: hostKeyId,
-      identityId: hostIdentityId
+      identityId: hostIdentityId,
+      openWithSFTP: hostOpenWithSFTP
     };
 
     if (isNewHostMode) {
@@ -899,9 +903,48 @@ export default function HostsDashboard({
             </div>
 
             <form className="pane-form connection-form-container" onSubmit={handleSaveHost}>
-              {/* Block 1: Credentials (Xác thực) */}
+              {/* Block 1: Host Info (Mạng) - Luôn lên đầu */}
               <div className="pane-section" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '16px', marginBottom: '16px' }}>
-                <h4 className="section-title" style={{ marginTop: 0, marginBottom: '12px' }}>1. Credentials (Xác thực)</h4>
+                <h4 className="section-title" style={{ marginTop: 0, marginBottom: '12px' }}>1. Host Connection (Địa chỉ)</h4>
+                
+                <div className="form-group" style={{ marginBottom: '12px' }}>
+                  <label>Label (Tên gợi nhớ)</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Production Server"
+                    value={hostLabel}
+                    onChange={(e) => setHostLabel(e.target.value)}
+                    required
+                    id="input-conn-label"
+                    autoFocus
+                  />
+                </div>
+                <div className="form-group" style={{ marginBottom: '12px' }}>
+                  <label>Host Address (IP/Hostname)</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. 192.168.1.100"
+                    value={hostAddress}
+                    onChange={(e) => setHostAddress(e.target.value)}
+                    required
+                    id="input-conn-host"
+                  />
+                </div>
+                <div className="form-group" style={{ marginBottom: '12px' }}>
+                  <label>SSH Port</label>
+                  <input 
+                    type="text" 
+                    placeholder="22"
+                    value={hostPort}
+                    onChange={(e) => setHostPort(e.target.value)}
+                    id="input-conn-port"
+                  />
+                </div>
+              </div>
+
+              {/* Block 2: Credentials (Xác thực) */}
+              <div className="pane-section" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '16px', marginBottom: '16px' }}>
+                <h4 className="section-title" style={{ marginTop: 0, marginBottom: '12px' }}>2. Credentials (Xác thực)</h4>
                 
                 <div className="form-group animate-fade-in" style={{ marginBottom: '12px' }}>
                   <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1009,44 +1052,6 @@ export default function HostsDashboard({
                 )}
               </div>
 
-              {/* Block 2: Host Info (Mạng) */}
-              <div className="pane-section" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '16px', marginBottom: '16px' }}>
-                <h4 className="section-title" style={{ marginTop: 0, marginBottom: '12px' }}>2. Host Connection (Mạng)</h4>
-                
-                <div className="form-group" style={{ marginBottom: '12px' }}>
-                  <label>Label (Tên gợi nhớ)</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. Production Server"
-                    value={hostLabel}
-                    onChange={(e) => setHostLabel(e.target.value)}
-                    required
-                    id="input-conn-label"
-                  />
-                </div>
-                <div className="form-group" style={{ marginBottom: '12px' }}>
-                  <label>Host Address (IP/Hostname)</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. 192.168.1.100"
-                    value={hostAddress}
-                    onChange={(e) => setHostAddress(e.target.value)}
-                    required
-                    id="input-conn-host"
-                  />
-                </div>
-                <div className="form-group" style={{ marginBottom: '12px' }}>
-                  <label>SSH Port</label>
-                  <input 
-                    type="text" 
-                    placeholder="22"
-                    value={hostPort}
-                    onChange={(e) => setHostPort(e.target.value)}
-                    id="input-conn-port"
-                  />
-                </div>
-              </div>
-
               {/* Block 3: Phân loại */}
               <div className="pane-section" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '16px', marginBottom: '16px' }}>
                 <h4 className="section-title" style={{ marginTop: 0, marginBottom: '12px' }}>3. Categorization (Phân loại)</h4>
@@ -1110,6 +1115,33 @@ export default function HostsDashboard({
                     onChange={(e) => setHostTags(e.target.value)}
                     id="input-conn-tags"
                   />
+                </div>
+
+                {/* Toggle mở kèm SFTP */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderTop: '1px solid rgba(255,255,255,0.05)', marginTop: '8px' }}>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-main)' }}>Mở kèm SFTP Explorer</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Tự động hiển SFTP khi kết nối</div>
+                  </div>
+                  <button
+                    type="button"
+                    id="toggle-open-with-sftp"
+                    onClick={() => setHostOpenWithSFTP(v => !v)}
+                    style={{
+                      width: '44px', height: '24px', borderRadius: '12px',
+                      background: hostOpenWithSFTP ? 'var(--termius-accent)' : 'rgba(255,255,255,0.1)',
+                      border: 'none', cursor: 'pointer', position: 'relative',
+                      transition: 'background 0.2s ease', flexShrink: 0
+                    }}
+                  >
+                    <span style={{
+                      position: 'absolute', top: '3px',
+                      left: hostOpenWithSFTP ? '23px' : '3px',
+                      width: '18px', height: '18px', borderRadius: '50%',
+                      background: 'white', transition: 'left 0.2s ease',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+                    }} />
+                  </button>
                 </div>
               </div>
 

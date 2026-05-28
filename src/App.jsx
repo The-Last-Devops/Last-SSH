@@ -150,22 +150,27 @@ export default function App() {
     }
 
     const tabId = generateUniqueId('tab-ssh');
-    
-    // Tạo phiên SSH mô phỏng
-    const session = sshSimulator.createSession(tabId, resolvedProfile, keys);
+    resolvedProfile.tabId = tabId; // Truyền tabId để Electron quản lý session
+
+    const isDesktop = typeof window !== 'undefined' && window.electronAPI !== undefined;
 
     const initialHistory = [
-      { type: 'system', text: `\r\nStarting SSH connection to ${resolvedProfile.label}...` }
+      { type: 'system', text: `\r\nStarting SSH connection to ${resolvedProfile.label || resolvedProfile.host}...` }
     ];
-    session.logs.forEach(log => {
-      initialHistory.push({ type: 'output', text: log });
-    });
+
+    // Chỉ tạo session giả lập nếu KHÔNG chạy trong Electron Desktop
+    if (!isDesktop) {
+      const session = sshSimulator.createSession(tabId, resolvedProfile, keys);
+      session.logs.forEach(log => {
+        initialHistory.push({ type: 'output', text: log });
+      });
+    }
 
     const newTab = {
       id: tabId,
       title: `ssh: ${resolvedProfile.host}`,
       type: 'ssh',
-      currentPath: `/home/${resolvedProfile.username}`,
+      currentPath: `/home/${resolvedProfile.username || 'ubuntu'}`,
       history: initialHistory,
       commandHistory: [],
       connectionProfile: resolvedProfile

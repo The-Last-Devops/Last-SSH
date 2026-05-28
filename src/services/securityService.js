@@ -10,12 +10,12 @@ function bufferToBase64(buffer) {
   for (let i = 0; i < bytes.byteLength; i++) {
     binary += String.fromCharCode(bytes[i]);
   }
-  return typeof window !== 'undefined' ? window.btoa(binary) : Buffer.from(binary, 'binary').toString('base64');
+  return typeof window !== 'undefined' ? window.btoa(binary) : btoa(binary);
 }
 
 // Helper: Chuyển đổi Base64 sang ArrayBuffer
 function base64ToBuffer(base64) {
-  const binary = typeof window !== 'undefined' ? window.atob(base64) : Buffer.from(base64, 'base64').toString('binary');
+  const binary = typeof window !== 'undefined' ? window.atob(base64) : atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
@@ -61,7 +61,7 @@ class SecurityService {
       return true;
     } catch (e) {
       console.error('Lỗi khi thiết lập PIN:', e);
-      throw new Error('Không thể thiết lập mã PIN bảo mật: ' + e.message);
+      throw new Error('Không thể thiết lập mã PIN bảo mật: ' + e.message, { cause: e });
     }
   }
 
@@ -89,7 +89,7 @@ class SecurityService {
       this.isUnlocked = true;
       return decryptedData;
     } catch (e) {
-      throw new Error('Mã PIN không chính xác hoặc dữ liệu bị hỏng');
+      throw new Error('Mã PIN không chính xác hoặc dữ liệu bị hỏng', { cause: e });
     }
   }
 
@@ -119,7 +119,7 @@ class SecurityService {
       return true;
     } catch (e) {
       console.error('Lỗi khi lưu dữ liệu mã hóa:', e);
-      throw new Error('Lỗi bảo mật khi lưu dữ liệu: ' + e.message);
+      throw new Error('Lỗi bảo mật khi lưu dữ liệu: ' + e.message, { cause: e });
     }
   }
 
@@ -250,7 +250,7 @@ class SecurityService {
     try {
       // Kiểm tra xem thiết bị có hỗ trợ Touch ID/Windows Hello (Platform Authenticator) không
       return await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-    } catch (e) {
+    } catch {
       return false;
     }
   }
@@ -310,7 +310,7 @@ class SecurityService {
       return true;
     } catch (e) {
       console.error('Lỗi đăng ký vân tay:', e);
-      throw new Error('Quá trình quét vân tay bị hủy hoặc lỗi: ' + e.message);
+      throw new Error('Quá trình quét vân tay bị hủy hoặc lỗi: ' + e.message, { cause: e });
     }
   }
 
@@ -361,7 +361,7 @@ class SecurityService {
       return await this.unlockWithPIN(decryptedPin);
     } catch (e) {
       console.error('Lỗi xác thực vân tay:', e);
-      throw new Error('Xác thực vân tay thất bại: ' + e.message);
+      throw new Error('Xác thực vân tay thất bại: ' + e.message, { cause: e });
     }
   }
 }
