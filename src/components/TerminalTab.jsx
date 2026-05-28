@@ -65,6 +65,11 @@ export default function TerminalTab({
 
   // Tập trung vào input khi click vào container
   const handleContainerClick = () => {
+    // Nếu người dùng đang bôi đen (chọn text), giữ nguyên lựa chọn và không ép focus làm mất selection
+    const selection = window.getSelection();
+    if (selection && selection.toString().trim() !== '') {
+      return;
+    }
     if (inputRef.current) {
       inputRef.current.focus();
     }

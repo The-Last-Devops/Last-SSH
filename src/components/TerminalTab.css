@@ -123,3 +123,24 @@
   pointer-events: none;
   z-index: 10;
 }
+
+/* Enable text selection inside terminal */
+.terminal-container,
+.terminal-container *,
+.terminal-history,
+.terminal-history *,
+.terminal-line,
+.terminal-line * {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
+/* Custom Selection Highlight Style for premium look */
+.terminal-container ::selection {
+  background: rgba(var(--accent-rgb), 0.25);
+  color: var(--text-bright);
+}
+.terminal-container *::selection {
+  background: rgba(var(--accent-rgb), 0.25);
+  color: var(--text-bright);
+}

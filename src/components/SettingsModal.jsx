@@ -173,6 +173,25 @@ export default function SettingsModal({
     }
   };
 
+  // Đọc file Private Key nhanh từ máy tính [NEW]
+  const handleSettingsKeyFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target.result;
+      setKeyContent(content);
+      
+      // Nếu nhãn khóa chưa được đặt, tự động lấy tên tệp bỏ đuôi mở rộng
+      if (!keyLabel.trim()) {
+        setKeyLabel(file.name.replace(/\.[^/.]+$/, ""));
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // Reset input file
+  };
+
   // 7. Thêm mới Key
   const handleKeySubmit = (e) => {
     e.preventDefault();
@@ -195,12 +214,8 @@ export default function SettingsModal({
 
   // Danh sách themes hỗ trợ
   const themeList = [
-    { name: 'Glass Aura', color: '#aa3bff', desc: 'Glassmorphism' },
-    { name: 'Cyberpunk Neon', color: '#ff007f', desc: 'Neon Cyberpunk' },
-    { name: 'One Dark Pro', color: '#61afef', desc: 'Professional' },
-    { name: 'Dracula', color: '#bd93f9', desc: 'Huyền bí dark' },
-    { name: 'Retro Amber', color: '#ffb000', desc: 'CRT Hoài cổ' },
-    { name: 'Light Terminus', color: '#ff5722', desc: 'Theme sáng Terminus' }
+    { name: 'Dark', color: '#1e1e1e', desc: 'Giao diện tối chuyên nghiệp' },
+    { name: 'Light', color: '#ffffff', desc: 'Giao diện sáng tương phản cao' }
   ];
 
   return (
@@ -375,8 +390,29 @@ export default function SettingsModal({
                   />
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Private Key Content (PEM Format)</label>
+                 <div className="form-group">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label className="form-label">Private Key Content (PEM Format)</label>
+                    <div>
+                      <input 
+                        type="file"
+                        id="settings-key-file-upload"
+                        style={{ display: 'none' }}
+                        onChange={handleSettingsKeyFileChange}
+                        accept=".pem,.key,id_rsa,id_dsa,id_ecdsa,id_ed25519,.*"
+                      />
+                      <button
+                        type="button"
+                        className="glass-button"
+                        style={{ padding: '2px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        onClick={() => document.getElementById('settings-key-file-upload').click()}
+                        title="Chọn file Private Key từ máy tính"
+                      >
+                        <Upload size={11} />
+                        Chọn File Khóa (.pem)
+                      </button>
+                    </div>
+                  </div>
                   <textarea 
                     className="glass-input key-textarea" 
                     value={keyContent}

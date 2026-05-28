@@ -270,7 +270,9 @@ test.describe('Last SSH E2E Tests', () => {
     await page.locator('input[placeholder="e.g. 192.168.1.100"]').fill('172.16.0.5');
     await page.locator('#input-conn-username').fill('e2e-user');
     await page.locator('#input-conn-password').fill(''); // Bỏ trống mật khẩu để dùng Key
-    await page.locator('#input-conn-group').fill('E2E Foldered Group');
+    // Chọn Tạo nhóm mới từ dropdown và điền nhóm
+    await page.locator('#select-conn-group').selectOption('__new_group__');
+    await page.locator('#input-conn-group-custom').fill('E2E Foldered Group');
     await page.locator('#input-conn-tags').fill('prod, secure, gateway');
     
     // Chọn Private Key từ dropdown

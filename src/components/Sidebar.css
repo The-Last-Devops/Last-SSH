@@ -44,6 +44,13 @@
   gap: 20px;
 }
 
+.sidebar-content::after {
+  content: '';
+  display: block;
+  height: 40px;
+  flex-shrink: 0;
+}
+
 .section-title {
   font-size: 11px;
   font-weight: 700;
@@ -208,15 +215,22 @@
 
 /* Add Connection Form Drawer/Modal styles */
 .connection-form-container {
-  padding: 16px;
+  padding: 14px;
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   gap: 12px;
   margin-top: 8px;
+  margin-right: 4px; /* Tránh đè nút collapse bay lơ lửng */
   animation: fadeIn 0.2s ease;
+}
+
+.connection-form-container .form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
 }
 
 .form-title {
@@ -230,9 +244,14 @@
 
 .form-actions {
   display: flex;
-  justify-content: flex-end;
   gap: 8px;
-  margin-top: 6px;
+  margin-top: 12px;
+  width: 100%;
+}
+
+.form-actions button {
+  flex: 1;
+  justify-content: center;
 }
 
 /* Sidebar Live Search styling */
@@ -409,5 +428,351 @@
   border: 1px dashed var(--border-color);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.01);
+}
+
+/* ==========================================================================
+   SIDEBAR RESIZER & COLLAPSED MINI-MODE STYLES
+   ========================================================================== */
+
+/* Resizer Bar */
+.sidebar-resizer {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.2s, box-shadow 0.2s;
+  flex-shrink: 0;
+  z-index: 100;
+  position: relative;
+}
+
+.sidebar-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  right: -3px;
+  cursor: col-resize;
+}
+
+.sidebar-resizer:hover,
+.sidebar-resizer:active {
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+/* Prevent text selection and mouse events during resizing */
+body.resizing * {
+  user-select: none !important;
+  pointer-events: none !important;
+}
+
+body.resizing .sidebar-resizer {
+  pointer-events: auto !important;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+/* Collapse Toggle Button (Floating elegant circle) */
+.sidebar-collapse-toggle {
+  position: absolute;
+  right: -10px;
+  top: 54px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.sidebar-collapse-toggle:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+  transform: scale(1.15);
+}
+
+/* Collapsed Mini Sidebar styles */
+.sidebar-container.collapsed {
+  width: 64px !important;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.collapsed-header {
+  justify-content: center !important;
+  padding: 16px 0 !important;
+}
+
+.collapsed-content {
+  padding: 16px 8px !important;
+  align-items: center !important;
+  gap: 16px !important;
+}
+
+.collapsed-footer {
+  padding: 16px 8px !important;
+  align-items: center !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+}
+
+.mini-btn-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.mini-circle-btn {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-bright) !important;
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.mini-circle-btn:hover {
+  background: rgba(var(--accent-rgb), 0.1) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+  box-shadow: 0 0 10px var(--accent-glow) !important;
+  transform: translateY(-1px);
+}
+
+.mini-connections-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  align-items: center;
+}
+
+.connection-item-mini {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1.5px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.connection-item-mini:hover {
+  background: rgba(255, 255, 255, 0.06);
+  transform: scale(1.08) translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Tooltip for Collapsed Sidebar */
+.mini-tooltip {
+  position: absolute;
+  left: 52px;
+  top: 50%;
+  transform: translateY(-50%) translateX(10px);
+  background: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+  border-radius: 6px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  opacity: 0;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.connection-item-mini:hover .mini-tooltip {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+.mini-tooltip-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.mini-tooltip-host {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  font-family: 'Fira Code', monospace;
+}
+
+.mini-tooltip-group {
+  font-size: 10px;
+  color: var(--accent);
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+/* Add custom animations for slide actions */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ==========================================================================
+   QUICK KEY MANAGER & INLINE DROPDOWN GROUP STYLES
+   ========================================================================== */
+
+.form-group-with-action {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.form-group-with-action select,
+.form-group-with-action input {
+  flex-grow: 1;
+}
+
+.inline-key-manage-btn,
+.inline-group-back-btn {
+  width: 36px !important;
+  height: 34px !important;
+  padding: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 6px !important;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+
+.inline-key-manage-btn:hover,
+.inline-group-back-btn:hover {
+  background: rgba(var(--accent-rgb), 0.12) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 8px var(--accent-glow) !important;
+}
+
+/* Quick Key Manager Panel */
+.quick-key-manager-panel {
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px dashed rgba(var(--accent-rgb), 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.quick-key-panel-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 4px;
+}
+
+.quick-key-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 100px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.quick-key-empty {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 6px 0;
+  font-style: italic;
+}
+
+.quick-key-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.quick-key-item-label {
+  font-size: 11px;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.quick-key-delete-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.quick-key-delete-btn:hover {
+  color: var(--term-red);
+  background: rgba(255, 85, 98, 0.1);
+}
+
+/* Quick Key Add Form */
+.quick-key-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.quick-key-input-field {
+  font-size: 11px !important;
+  padding: 6px 8px !important;
+  border-radius: 4px !important;
+}
+
+.textarea-key {
+  font-family: 'Fira Code', monospace !important;
+  font-size: 9.5px !important;
+  line-height: 1.4 !important;
+  resize: vertical;
+}
+
+.quick-key-save-btn {
+  font-size: 11px !important;
+  padding: 6px !important;
+  width: 100% !important;
+  text-align: center;
 }
 

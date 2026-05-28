@@ -1,6 +1,6 @@
 import { virtualFS } from './virtualFS.js';
 
-const COMMANDS = ['help', 'ls', 'cd', 'pwd', 'mkdir', 'touch', 'cat', 'echo', 'rm', 'clear', 'neofetch', 'theme', 'ssh'];
+const COMMANDS = ['help', 'ls', 'cd', 'pwd', 'mkdir', 'touch', 'cat', 'echo', 'rm', 'clear', 'neofetch', 'theme', 'ssh', 'ping'];
 
 export class ShellEngine {
   constructor() {
@@ -95,6 +95,9 @@ export class ShellEngine {
       case 'ssh':
         result = this.cmdSsh(cmdArgs);
         break;
+      case 'ping':
+        result = this.cmdPing(cmdArgs);
+        break;
     }
 
     // Nếu có chuyển hướng đầu ra (redirect > hoặc >>)
@@ -108,7 +111,7 @@ export class ShellEngine {
             if (currentContent && !currentContent.endsWith('\n')) {
               currentContent += '\n';
             }
-          } catch (e) {
+          } catch {
             // Tệp chưa tồn tại thì ghi mới
           }
           finalContent = currentContent + finalContent;
@@ -309,9 +312,9 @@ export class ShellEngine {
       '    \x1b[1;35m> ^ <  \x1b[0m    \x1b[1;33mOS\x1b[0m: Last SSH Web OS v1.0',
       '   \x1b[1;34m/     \\ \x1b[0m    \x1b[1;33mHost\x1b[0m: Gemini-Agent Client v1',
       '  \x1b[1;34m(|     |)\x1b[0m    \x1b[1;33mKernel\x1b[0m: Web-HTML5/React Engine',
-      '   \x1b[1;34m===   ===\x1b[0m   \x1b[1;33mUptime\x1b[0m: ${uptimeStr}',
+      `   \x1b[1;34m===   ===\x1b[0m   \x1b[1;33mUptime\x1b[0m: ${uptimeStr}`,
       '  \x1b[1;31m(___)___)\x1b[0m    \x1b[1;33mShell\x1b[0m: LastSSHMockShell v1.0.0',
-      '               \x1b[1;33mTheme\x1b[0m: ${activeTheme}',
+      `               \x1b[1;33mTheme\x1b[0m: ${activeTheme}`,
       '               \x1b[1;33mFont\x1b[0m: Fira Code / Source Code Pro',
       '               \x1b[1;33mCPU\x1b[0m: Simulated Gemini CPU @ 3.5GHz',
       '               \x1b[1;33mMemory\x1b[0m: 4.8GB / 16.0GB (Simulated)'
@@ -320,9 +323,8 @@ export class ShellEngine {
     return { stdout: logo.join('\n'), stderr: '', newPath: null };
   }
 
-  // 11. Lệnh theme
   cmdTheme(args) {
-    const themes = ['Glass Aura', 'Cyberpunk Neon', 'One Dark Pro', 'Dracula', 'Retro Amber'];
+    const themes = ['Dark', 'Light'];
     if (args.length === 0) {
       return { 
         stdout: `Theme hiện tại đang khả dụng:\n${themes.map(t => `  - ${t}`).join('\n')}\n\nGõ 'theme <tên_theme>' để đổi theme nhanh.`, 
@@ -355,6 +357,24 @@ export class ShellEngine {
     return { stdout: `ssh_connect:${dest}`, stderr: '', newPath: null };
   }
 
+  // 13. Lệnh ping
+  cmdPing(args) {
+    const address = args[0];
+    if (!address) {
+      return { stdout: '', stderr: 'ping: missing host operand', newPath: null };
+    }
+    const list = [
+      `PING ${address} (${address}) 56(84) bytes of data.`,
+      `64 bytes from ${address}: icmp_seq=1 ttl=64 time=8.45 ms`,
+      `64 bytes from ${address}: icmp_seq=2 ttl=64 time=7.12 ms`,
+      `64 bytes from ${address}: icmp_seq=3 ttl=64 time=9.03 ms`,
+      `\n--- ${address} ping statistics ---`,
+      `3 packets transmitted, 3 received, 0% packet loss, time 2002ms`,
+      `rtt min/avg/max/mdev = 7.124/8.201/9.032/0.812 ms`
+    ];
+    return { stdout: list.join('\n'), stderr: '', newPath: null };
+  }
+
   // Tính năng Tự động hoàn thành (Tab Completion)
   autocomplete(currentPath, inputLine) {
     const trimmed = inputLine || '';
@@ -372,7 +392,6 @@ export class ShellEngine {
 
     // Trường hợp 2: Đang gõ lệnh + đối số tệp tin/thư mục
     const lastSpaceIndex = trimmed.lastIndexOf(' ');
-    const commandPart = trimmed.slice(0, lastSpaceIndex).trim();
     const partialPath = trimmed.slice(lastSpaceIndex + 1);
 
     // Xác định thư mục cha của phần tệp đang tìm kiếm
@@ -409,7 +428,7 @@ export class ShellEngine {
         prefix: partialPath,
         completed: matches.length === 1 ? matches[0] : null
       };
-    } catch (e) {
+    } catch {
       return { matches: [], prefix: filePrefix, completed: null };
     }
   }

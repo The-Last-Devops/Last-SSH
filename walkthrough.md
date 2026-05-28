@@ -51,11 +51,16 @@ Dự án phát triển ứng dụng **Last SSH** (phát triển bằng **React 1
 * Dữ liệu truyền P2P ngang hàng trực tiếp, được **mã hóa AES-GCM** bảo vệ bằng mật mã ở máy gửi và chỉ giải mã được ở máy nhận khi nhập đúng PIN, bảo mật tuyệt đối 100% không sợ bên thứ 3 nghe lén.
 
 ### 6. Tính năng Quản lý SSH Nâng cao & Premium
-* **SSH Private Keys Manager:** Hộp thoại cài đặt tích hợp tab quản lý khóa bảo mật chuyên dụng, hỗ trợ thêm/sửa/xóa các Private Keys dạng PEM cùng Passphrase.
+* **SSH Private Keys Manager:** Hộp thoại cài đặt tích hợp tab quản lý khóa bảo mật chuyên dụng, hỗ trợ thêm/sửa/xóa các Private Keys dạng PEM cùng Passphrase. Hỗ trợ tính năng cao cấp chọn tệp tin từ thiết bị thật để đọc tự động bằng FileReader. [NEW]
 * **Folder Grouping (Expandable):** Phân nhóm danh sách các host/server trên Sidebar dưới dạng thư mục thu gọn/mở rộng trực quan, tối ưu quản lý số lượng lớn server.
 * **HSL Color Tag Badges:** Gắn thẻ tag linh hoạt (như `prod`, `secure`, `database`) được trang trí bằng dot màu sắc HSL cao cấp, hài hòa.
 * **Sidebar Live Search:** Thanh tìm kiếm trực tiếp trên đầu danh sách sidebar giúp lọc ngay lập tức server theo tên, thư mục group, hoặc tag badge.
 * **Mô phỏng xác thực SSH Key:** Trình SSH Simulator tự động nhận diện khóa liên kết và in ra quy trình trao đổi key, xác thực chữ ký khóa công khai vô cùng chân thực.
+
+### 7. Sidebar Co giãn (Resize) & Thu gọn (Collapse) Linh hoạt [NEW]
+* **Co giãn chiều rộng (Resize):** Hỗ trợ rê chuột kéo giãn tự do chiều rộng của Sidebar từ `180px` đến `450px`, tích hợp thanh phân cách `.sidebar-resizer` nhạy bén phát sáng màu accent đầy quyến rũ khi rê chuột qua. Kích thước tùy chỉnh được lưu trữ tự động trong LocalStorage.
+* **Thu gọn cực gọn (Collapse):** Tích hợp nút Toggle Chevron tròn bay lơ lửng ở mép phân chia. Khi thu gọn, Sidebar chuyển sang chế độ mini-mode chỉ `64px`, ẩn logo text, search bar và chuyển các nút điều khiển, danh sách host thành các icon tròn có viền màu tag tương ứng.
+* **Premium Tooltip trên Mini Sidebar:** Khi rê chuột vào các icon máy chủ mini ở trạng thái thu gọn, hiển thị một Tooltip sang xịn mịn cung cấp đầy đủ thông tin label, username@host:port và nhóm thư mục cực kỳ chuyên nghiệp.
 
 ---
 
@@ -118,14 +123,14 @@ terminus-clone/
 ### 1. Kiểm thử tự động (Vitest):
 Hệ thống kiểm thử hoạt động hoàn hảo, bao phủ toàn bộ các góc cạnh logic dịch vụ lõi, giao diện màn hình khóa và các tính năng nâng cao mới thêm. 
 
-**Kết quả chạy: 24/24 tests passed thành công 100%!**
+**Kết quả chạy: 25/25 tests passed thành công 100%!**
 
 ```bash
 > vitest run
 
  RUN  v4.1.7 /Users/KienNT/Code/kien/terminus-clone
 
- ✓ src/__tests__/advancedFeatures.test.js (1 test) 4ms
+ ✓ src/__tests__/advancedFeatures.test.js (2 tests) 5ms
  ✓ src/__tests__/sshSimulator.test.js (3 tests) 5ms
  ✓ src/__tests__/virtualFS.test.js (5 tests) 5ms
  ✓ src/__tests__/shellEngine.test.js (5 tests) 12ms
@@ -143,19 +148,20 @@ Hệ thống kiểm thử hoạt động hoàn hảo, bao phủ toàn bộ các 
  
  Để đảm bảo ứng dụng vận hành 100% chính xác giống như hành vi thực tế của người dùng, chúng ta đã tích hợp bộ công cụ kiểm thử trình duyệt cao cấp **Playwright**.
  
- **Kết quả chạy Playwright E2E thành công vượt mong đợi (5/5 tests passed):**
+ **Kết quả chạy Playwright E2E thành công vượt mong đợi (6/6 tests passed):**
  
  ```bash
  > npm run test:e2e
  
- Running 5 tests using 4 workers
+ Running 6 tests using 4 workers
  
- [1/5] [chromium] › e2e/terminus.spec.js:54:3 › Last SSH E2E Tests › Kịch bản 2: Đăng ký mã PIN bảo mật, reload trang và kiểm tra màn hình khóa LockScreen
- [2/5] [chromium] › e2e/terminus.spec.js:159:3 › Last SSH E2E Tests › Kịch bản 4: Đồng bộ P2P WebRTC song song giữa 2 browser contexts
- [3/5] [chromium] › e2e/terminus.spec.js:16:3 › Last SSH E2E Tests › Kịch bản 1: Mở ứng dụng, tạo Terminal cục bộ và chạy lệnh ảo
- [4/5] [chromium] › e2e/terminus.spec.js:112:3 › Last SSH E2E Tests › Kịch bản 3: Tương tác kết nối SSH giả lập và đồng bộ SFTP visual split-pane
- [5/5] [chromium] › e2e/terminus.spec.js:232:3 › Last SSH E2E Tests › Kịch bản 5: Quản lý SSH Private Keys, Folders, Tags, Live Search và Xác thực SSH Key nâng cao
-   5 passed (22.9s)
+ [1/6] [chromium] › e2e/terminus.spec.js:54:3 › Last SSH E2E Tests › Kịch bản 2: Đăng ký mã PIN bảo mật, reload trang và kiểm tra màn hình khóa LockScreen
+ [2/6] [chromium] › e2e/terminus.spec.js:159:3 › Last SSH E2E Tests › Kịch bản 4: Đồng bộ P2P WebRTC song song giữa 2 browser contexts
+ [3/6] [chromium] › e2e/terminus.spec.js:16:3 › Last SSH E2E Tests › Kịch bản 1: Mở ứng dụng, tạo Terminal cục bộ và chạy lệnh ảo
+ [4/6] [chromium] › e2e/terminus.spec.js:112:3 › Last SSH E2E Tests › Kịch bản 3: Tương tác kết nối SSH giả lập và đồng bộ SFTP visual split-pane
+ [5/6] [chromium] › e2e/terminus.spec.js:232:3 › Last SSH E2E Tests › Kịch bản 5: Quản lý SSH Private Keys, Folders, Tags, Live Search và Xác thực SSH Key nâng cao
+ [6/6] [chromium] › e2e/visual.spec.js:18:3 › Last SSH Visual UI Tests & Screenshot Captures › Chụp ảnh màn hình giao diện để phân tích tối ưu hóa thiết kế
+   6 passed (22.9s)
  ```
  
  * **Kịch bản 1 (Terminal cục bộ):** Tạo thư mục ảo, gõ lệnh `ls`, `neofetch`, `clear` -> Thành công.

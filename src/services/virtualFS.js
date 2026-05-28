@@ -103,7 +103,7 @@ class VirtualFS {
         this.isInMemory = true;
         this.fs = JSON.parse(JSON.stringify(DEFAULT_FS));
       }
-    } catch (e) {
+    } catch {
       this.isInMemory = true;
       this.fs = JSON.parse(JSON.stringify(DEFAULT_FS));
     }
@@ -149,7 +149,7 @@ class VirtualFS {
     if (current.endsWith('/') && current !== '/') current = current.slice(0, -1);
 
     // Xác định điểm xuất phát: nếu targetPath bắt đầu bằng '/' thì đi từ root, ngược lại đi từ current
-    let parts = [];
+    let parts;
     let node = this.fs;
 
     if (targetPath.startsWith('/')) {

@@ -12,15 +12,16 @@
 
 /* Sidebar Panel Layout */
 .sidebar-container {
-  width: 260px;
+  width: var(--sidebar-width, 260px);
   height: 100%;
   background: var(--sidebar-bg);
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  transition: all 0.3s ease;
+  transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   flex-shrink: 0;
   z-index: 10;
+  position: relative;
 }
 
 /* Main Area Layout */

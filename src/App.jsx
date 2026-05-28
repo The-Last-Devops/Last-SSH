@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import Sidebar from './components/Sidebar.jsx';
 import TabsBar from './components/TabsBar.jsx';
 import TerminalTab from './components/TerminalTab.jsx';
 import SFTPBrowser from './components/SFTPBrowser.jsx';
 import SettingsModal from './components/SettingsModal.jsx';
 import LockScreen from './components/LockScreen.jsx';
 import P2PSyncModal from './components/P2PSyncModal.jsx';
+import HostsDashboard from './components/HostsDashboard.jsx';
+import { Settings, FolderSync } from 'lucide-react';
 
 import { securityService } from './services/securityService.js';
 import { virtualFS } from './services/virtualFS.js';
@@ -14,12 +15,12 @@ import { sshSimulator } from './services/sshSimulator.js';
 import './App.css';
 
 const DEFAULT_SETTINGS = {
-  appTheme: 'Glass Aura',
-  terminalTheme: 'Glass Aura',
+  appTheme: 'Dark',
+  terminalTheme: 'Dark',
   fontFamily: 'Fira Code',
   fontSize: 14,
   cursorStyle: 'block',
-  crtEnabled: true
+  crtEnabled: false
 };
 
 const STORAGE_KEYS = {
@@ -43,12 +44,14 @@ export default function App() {
 
   // 3. Quản lý Đa Tab (Tab Management)
   const [tabs, setTabs] = useState([]);
-  const [activeTabId, setActiveTabId] = useState('');
+  const [activeTabId, setActiveTabId] = useState('hosts-dashboard');
 
   // 4. Trạng thái các Modal
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isP2PSyncOpen, setIsP2PSyncOpen] = useState(false);
   const [isSftpOpenMap, setIsSftpOpenMap] = useState({}); // tabId -> boolean
+
+
 
 
 
@@ -92,13 +95,12 @@ export default function App() {
     // Nếu đóng phiên SSH, dọn dẹp bộ nhớ SSH session
     sshSimulator.closeSession(tabId);
 
+    setTabs(remainingTabs);
+
     if (remainingTabs.length === 0) {
-      // Nếu đóng hết tab, tự tạo 1 tab local mới
-      openNewLocalTab();
+      setActiveTabId('hosts-dashboard');
       return;
     }
-
-    setTabs(remainingTabs);
 
     // Nếu đóng tab đang active -> Chuyển active sang tab cuối cùng
     if (activeTabId === tabId) {
@@ -238,26 +240,30 @@ export default function App() {
   // -------------------------------------------------------------
   const handleAddKey = async (newKey) => {
     const keyProfile = { ...newKey, id: generateUniqueId('key') };
-    const updated = [...keys, keyProfile];
+    const currentKeys = Array.isArray(keys) ? keys : [];
+    const updated = [...currentKeys, keyProfile];
     setKeys(updated);
     await saveKeysState(updated);
   };
 
   const handleEditKey = async (id, updatedKey) => {
-    const updated = keys.map(k => k.id === id ? { ...k, ...updatedKey } : k);
+    const currentKeys = Array.isArray(keys) ? keys : [];
+    const updated = currentKeys.map(k => k.id === id ? { ...k, ...updatedKey } : k);
     setKeys(updated);
     await saveKeysState(updated);
   };
 
   const handleDeleteKey = async (id) => {
     // Xóa liên kết khóa ở các connection profile
-    const updatedConns = connections.map(c => c.keyId === id ? { ...c, keyId: '' } : c);
+    const currentConns = Array.isArray(connections) ? connections : [];
+    const updatedConns = currentConns.map(c => c.keyId === id ? { ...c, keyId: '' } : c);
     if (JSON.stringify(updatedConns) !== JSON.stringify(connections)) {
       setConnections(updatedConns);
       await saveConnectionsState(updatedConns);
     }
 
-    const updated = keys.filter(k => k.id !== id);
+    const currentKeys = Array.isArray(keys) ? keys : [];
+    const updated = currentKeys.filter(k => k.id !== id);
     setKeys(updated);
     await saveKeysState(updated);
   };
@@ -296,7 +302,7 @@ export default function App() {
       setSettings(prev => ({ ...prev, ...decryptedPayload.settings }));
     }
     if (decryptedPayload.keys) {
-      setKeys(decryptedPayload.keys);
+      setKeys(Array.isArray(decryptedPayload.keys) ? decryptedPayload.keys : []);
     }
   };
 
@@ -317,9 +323,10 @@ export default function App() {
     }
     // 4. Cập nhật Keys
     if (importedData.keys) {
-      setKeys(importedData.keys);
+      const keysList = Array.isArray(importedData.keys) ? importedData.keys : [];
+      setKeys(keysList);
       if (!securityService.hasPIN()) {
-        localStorage.setItem(STORAGE_KEYS.KEYS_PLAIN, JSON.stringify(importedData.keys));
+        localStorage.setItem(STORAGE_KEYS.KEYS_PLAIN, JSON.stringify(keysList));
       }
     }
 
@@ -380,10 +387,30 @@ export default function App() {
       if (storedSettings) {
         try {
           const parsed = JSON.parse(storedSettings);
-          // Tương thích ngược: Nếu có settings.theme cũ, gán sang appTheme và terminalTheme
-          if (parsed.theme && !parsed.appTheme) {
-            parsed.appTheme = parsed.theme;
-            parsed.terminalTheme = parsed.theme;
+          
+          // Tự động tắt CRT scanlines nếu phát hiện cấu hình cũ chưa được di chuyển
+          if (!localStorage.getItem('lastssh_crt_fixed')) {
+            parsed.crtEnabled = false;
+            localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(parsed));
+            localStorage.setItem('lastssh_crt_fixed', 'true');
+          }
+          
+          const normalizeTheme = (themeName) => {
+            if (!themeName) return 'Dark';
+            const name = themeName.toLowerCase();
+            if (name === 'light' || name.includes('light') || name.includes('terminus') || name.includes('white')) {
+              return 'Light';
+            }
+            return 'Dark';
+          };
+
+          if (parsed.theme) {
+            parsed.appTheme = normalizeTheme(parsed.theme);
+            parsed.terminalTheme = normalizeTheme(parsed.theme);
+            delete parsed.theme;
+          } else {
+            if (parsed.appTheme) parsed.appTheme = normalizeTheme(parsed.appTheme);
+            if (parsed.terminalTheme) parsed.terminalTheme = normalizeTheme(parsed.terminalTheme);
           }
           setSettings({ ...DEFAULT_SETTINGS, ...parsed });
         } catch (e) {
@@ -406,15 +433,30 @@ export default function App() {
         const storedKeys = localStorage.getItem(STORAGE_KEYS.KEYS_PLAIN);
         if (storedKeys) {
           try {
-            setKeys(JSON.parse(storedKeys));
+            const parsed = JSON.parse(storedKeys);
+            setKeys(Array.isArray(parsed) ? parsed : []);
           } catch (e) {
             console.error('Lỗi đọc keys plain:', e);
+            setKeys([]);
           }
         }
       }
 
-      // Khởi tạo Tab Local đầu tiên
-      openNewLocalTab();
+      // Khởi tạo Tab Local đầu tiên ngầm
+      const tabId = generateUniqueId('tab-local');
+      const newTab = {
+        id: tabId,
+        title: 'Local terminal',
+        type: 'local',
+        currentPath: '/home/user',
+        history: [
+          { type: 'system', text: 'Welcome to Last SSH (React + Vite) v1.0.0.' },
+          { type: 'system', text: "Type 'help' to see simulated commands, or 'neofetch' for system info." }
+        ],
+        commandHistory: []
+      };
+      setTabs([newTab]);
+      setActiveTabId('hosts-dashboard');
     };
     bootstrap();
 
@@ -442,25 +484,15 @@ export default function App() {
 
       {/* 2. Giao diện làm việc chính của ứng dụng */}
       {!isLocked && (
-        <div className="app-container">
-          {/* Thanh bên trái: Sidebar - Connection Manager */}
-          <Sidebar 
-            connections={connections}
-            keys={keys}
-            onAddConnection={handleAddConnection}
-            onEditConnection={handleEditConnection}
-            onDeleteConnection={handleDeleteConnection}
-            onConnectSSH={handleConnectSSH}
-            onNewLocalTab={openNewLocalTab}
-            onOpenSettings={() => setIsSettingsOpen(true)}
-            onOpenP2PSync={() => setIsP2PSyncOpen(true)}
-          />
-
+        <div 
+          className="app-container"
+          style={{ '--sidebar-width': '0px' }}
+        >
           {/* Khung chính bên phải: MainContent */}
           <div className="main-content">
             
-            {/* Header: chứa TabsBar quản lý tab */}
-            <div className="header-bar">
+            {/* Header: chứa TabsBar quản lý tab và các điều khiển Settings/Sync toàn cục */}
+            <div className="header-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
               <TabsBar 
                 tabs={tabs}
                 activeTabId={activeTabId}
@@ -469,40 +501,73 @@ export default function App() {
                 onRenameTab={handleRenameTab}
                 onNewTab={openNewLocalTab}
               />
+              <div className="header-actions" style={{ display: 'flex', gap: '8px', paddingRight: '12px' }}>
+                <button 
+                  id="btn-p2p"
+                  className="toolbar-icon-btn" 
+                  onClick={() => setIsP2PSyncOpen(true)}
+                  title="P2P WebRTC Sync"
+                  style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '6px' }}
+                >
+                  <FolderSync size={16} />
+                </button>
+                <button 
+                  id="btn-settings"
+                  className="toolbar-icon-btn" 
+                  onClick={() => setIsSettingsOpen(true)}
+                  title="Preferences"
+                  style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '6px' }}
+                >
+                  <Settings size={16} />
+                </button>
+              </div>
             </div>
 
-            {/* Content: Hiển thị Terminal và SFTP Browser Split Pane */}
+            {/* Content: Hiển thị Terminal và SFTP Browser Split Pane HOẶC Hosts Dashboard */}
             <div className="content-frame">
-              {activeTab && (
-                <div className="split-pane">
-                  
-                  {/* Cửa sổ Terminal Tab */}
-                  <div className="terminal-pane">
-                    <TerminalTab 
-                      tab={activeTab}
-                      settings={settings}
-                      onUpdateTab={handleUpdateTab}
-                      onCloseTab={handleCloseTab}
-                      onSwitchToSFTP={handleSwitchToSFTP}
-                    />
-                  </div>
-
-                  {/* Cửa sổ visual SFTP (Chỉ hiện khi ở kết nối SSH và toggle bật) */}
-                  {isSftpOpen && (
-                    <div className="sftp-pane">
-                      <SFTPBrowser 
-                        tabId={activeTab.id}
-                        currentPath={activeTab.currentPath}
-                        onNavigate={(newPath) => {
-                          // Điều hướng SFTP visual đồng bộ cập nhật path trong tab state
-                          handleUpdateTab(activeTab.id, { currentPath: newPath });
-                        }}
-                        onTerminalLog={(msg) => handleSFTPTerminalLog(activeTab.id, msg)}
+              {activeTabId === 'hosts-dashboard' ? (
+                <HostsDashboard 
+                  connections={connections}
+                  keys={keys}
+                  onAddConnection={handleAddConnection}
+                  onEditConnection={handleEditConnection}
+                  onDeleteConnection={handleDeleteConnection}
+                  onConnectSSH={handleConnectSSH}
+                  onAddKey={handleAddKey}
+                  onDeleteKey={handleDeleteKey}
+                />
+              ) : (
+                activeTab && (
+                  <div className="split-pane">
+                    
+                    {/* Cửa sổ Terminal Tab */}
+                    <div className="terminal-pane">
+                      <TerminalTab 
+                        tab={activeTab}
+                        settings={settings}
+                        onUpdateTab={handleUpdateTab}
+                        onCloseTab={handleCloseTab}
+                        onSwitchToSFTP={handleSwitchToSFTP}
                       />
                     </div>
-                  )}
 
-                </div>
+                    {/* Cửa sổ visual SFTP (Chỉ hiện khi ở kết nối SSH và toggle bật) */}
+                    {isSftpOpen && (
+                      <div className="sftp-pane">
+                        <SFTPBrowser 
+                          tabId={activeTab.id}
+                          currentPath={activeTab.currentPath}
+                          onNavigate={(newPath) => {
+                            // Điều hướng SFTP visual đồng bộ cập nhật path trong tab state
+                            handleUpdateTab(activeTab.id, { currentPath: newPath });
+                          }}
+                          onTerminalLog={(msg) => handleSFTPTerminalLog(activeTab.id, msg)}
+                        />
+                      </div>
+                    )}
+
+                  </div>
+                )
               )}
             </div>
 

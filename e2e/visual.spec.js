@@ -31,9 +31,9 @@ test.describe('Last SSH Visual UI Tests & Screenshot Captures', () => {
     await page.waitForSelector('.modal-content');
     await page.screenshot({ path: path.join(screenshotDir, 'screenshot_settings_appearance.png') });
 
-    // Đổi App Theme và Terminal Theme sang Light Terminus mới để chụp ảnh giao diện sáng
-    await page.locator('.theme-grid').first().locator('.theme-card:has-text("Light Terminus")').click();
-    await page.locator('.theme-grid').last().locator('.theme-card:has-text("Light Terminus")').click();
+    // Đổi App Theme và Terminal Theme sang Light mới để chụp ảnh giao diện sáng
+    await page.locator('.theme-grid').first().locator('.theme-card:has-text("Light")').click();
+    await page.locator('.theme-grid').last().locator('.theme-card:has-text("Light")').click();
     
     // Đóng settings để chụp màn hình chính theme sáng màu
     await page.locator('.modal-close-btn').click();

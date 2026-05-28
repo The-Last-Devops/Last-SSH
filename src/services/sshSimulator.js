@@ -160,7 +160,7 @@ class SSHSimulator {
   // Duyệt đường dẫn trên Server từ xa (tương tự virtualFS nhưng chạy trên cây tệp ảo của SSH Session)
   resolveRemotePath(session, targetPath = '') {
     let current = session.currentPath;
-    let parts = [];
+    let parts;
     let node = session.fs;
 
     if (targetPath.startsWith('/')) {
@@ -329,6 +329,25 @@ class SSHSimulator {
         } else {
           delete node.children[name];
         }
+        break;
+      }
+
+      case 'ping': {
+        const address = args[0];
+        if (!address) {
+          stderr = 'ping: missing host operand';
+          break;
+        }
+        stdout = [
+          `PING ${address} (${address}) 56(84) bytes of data.`,
+          `64 bytes from ${address}: icmp_seq=1 ttl=64 time=14.2 ms`,
+          `64 bytes from ${address}: icmp_seq=2 ttl=64 time=12.5 ms`,
+          `64 bytes from ${address}: icmp_seq=3 ttl=64 time=15.1 ms`,
+          `64 bytes from ${address}: icmp_seq=4 ttl=64 time=11.9 ms`,
+          `\n--- ${address} ping statistics ---`,
+          `4 packets transmitted, 4 received, 0% packet loss, time 3004ms`,
+          `rtt min/avg/max/mdev = 11.921/13.435/15.102/1.248 ms`
+        ].join('\n');
         break;
       }
 

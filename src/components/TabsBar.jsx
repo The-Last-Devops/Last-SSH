@@ -44,6 +44,18 @@ export default function TabsBar({
 
   return (
     <div className="tabs-bar-container">
+      {/* Tab cố định Hosts */}
+      <div 
+        className={`tab-item static-tab ${activeTabId === 'hosts-dashboard' ? 'active' : ''}`}
+        onClick={() => onSelectTab('hosts-dashboard')}
+        title="Hosts Dashboard"
+        id="tab-static-hosts"
+      >
+        <span className="tab-title-text" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          🖥️ Hosts
+        </span>
+      </div>
+
       {tabs.map(tab => {
         const isActive = tab.id === activeTabId;
         const isSSH = tab.type === 'ssh';
@@ -103,7 +115,7 @@ export default function TabsBar({
         className="tab-add-btn"
         onClick={onNewTab}
         title="Open New Local Terminal"
-        id="btn-add-tab"
+        id="btn-new-local"
       >
         <Plus size={14} />
       </button>

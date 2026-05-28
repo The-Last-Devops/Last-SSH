@@ -54,8 +54,8 @@ describe('Advanced Features: Groups, Tags, Private Keys & Simulator Key Auth', (
     // Logic tương thích ngược giống hệt trong App.jsx
     const parseSettings = (stored) => {
       const DEFAULT_SETTINGS = {
-        appTheme: 'Glass Aura',
-        terminalTheme: 'Glass Aura',
+        appTheme: 'Dark',
+        terminalTheme: 'Dark',
         fontFamily: 'Fira Code',
         fontSize: 14,
         cursorStyle: 'block',
@@ -63,29 +63,60 @@ describe('Advanced Features: Groups, Tags, Private Keys & Simulator Key Auth', (
       };
       
       const parsed = { ...stored };
-      if (parsed.theme && !parsed.appTheme) {
-        parsed.appTheme = parsed.theme;
-        parsed.terminalTheme = parsed.theme;
+      const normalizeTheme = (themeName) => {
+        if (!themeName) return 'Dark';
+        const name = themeName.toLowerCase();
+        if (name === 'light' || name.includes('light') || name.includes('terminus') || name.includes('white')) {
+          return 'Light';
+        }
+        return 'Dark';
+      };
+
+      if (parsed.theme) {
+        parsed.appTheme = normalizeTheme(parsed.theme);
+        parsed.terminalTheme = normalizeTheme(parsed.theme);
+        delete parsed.theme;
+      } else {
+        if (parsed.appTheme) parsed.appTheme = normalizeTheme(parsed.appTheme);
+        if (parsed.terminalTheme) parsed.terminalTheme = normalizeTheme(parsed.terminalTheme);
       }
       return { ...DEFAULT_SETTINGS, ...parsed };
     };
 
     const finalSettings = parseSettings(legacySettings);
-    // Xác minh settings cũ tự động chuyển đổi sang các trường mới thành công
-    expect(finalSettings.appTheme).toBe('One Dark Pro');
-    expect(finalSettings.terminalTheme).toBe('One Dark Pro');
+    // Xác minh settings cũ tự động chuyển đổi sang các trường mới và chuẩn hóa về Dark/Light thành công
+    expect(finalSettings.appTheme).toBe('Dark');
+    expect(finalSettings.terminalTheme).toBe('Dark');
     expect(finalSettings.fontFamily).toBe('Source Code Pro');
     expect(finalSettings.fontSize).toBe(15);
 
     // Xác minh khả năng phân tách cấu hình độc lập
-    const customizedSettings = {
-      ...finalSettings,
+    const customizedSettings = parseSettings({
       appTheme: 'Light Terminus',
       terminalTheme: 'Dracula'
-    };
+    });
 
-    expect(customizedSettings.appTheme).toBe('Light Terminus');
-    expect(customizedSettings.terminalTheme).toBe('Dracula');
+    expect(customizedSettings.appTheme).toBe('Light');
+    expect(customizedSettings.terminalTheme).toBe('Dark');
+  });
+
+  it('nên hỗ trợ gom nhóm danh mục folder groups và xử lý logic keys liên kết drop-down', () => {
+    const connections = [
+      { id: '1', group: 'Production' },
+      { id: '2', group: 'Staging' },
+      { id: '3', group: 'Production' }
+    ];
+    
+    // Gom nhóm không lặp giống hệt logic trong Sidebar.jsx
+    const existingGroups = Array.from(new Set(connections.map(c => c.group || 'Servers')));
+    if (!existingGroups.includes('Servers')) {
+      existingGroups.push('Servers');
+    }
+
+    expect(existingGroups).toContain('Production');
+    expect(existingGroups).toContain('Staging');
+    expect(existingGroups).toContain('Servers');
+    expect(existingGroups.length).toBe(3);
   });
 
 });
