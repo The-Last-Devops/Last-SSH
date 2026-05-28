@@ -27,6 +27,7 @@ class SecurityService {
   constructor() {
     this.isUnlocked = true;
     this.activeKey = null; // Khóa giải mã đang hoạt động trong phiên
+    this.activeKeySalt = null; // Salt dùng để tái tạo lại cùng khóa trên phiên sau
   }
 
   // Kiểm tra xem người dùng đã thiết lập mã PIN chưa
@@ -41,6 +42,7 @@ class SecurityService {
   lock() {
     this.isUnlocked = false;
     this.activeKey = null;
+    this.activeKeySalt = null;
   }
 
   // Thiết lập mã PIN mới và mã hóa dữ liệu ban đầu
@@ -103,15 +105,13 @@ class SecurityService {
       return false;
     }
 
-    // Do mã hóa cần pin, chúng ta cần lưu trữ khóa đối xứng activeKey trong bộ nhớ phiên.
-    // Nếu activeKey bị trống (ví dụ F5), app sẽ bắt đăng nhập lại từ LockScreen.
-    if (!this.activeKey) {
+    if (!this.activeKey || !this.activeKeySalt) {
       throw new Error('Phiên làm việc hết hạn, vui lòng xác thực lại');
     }
 
     try {
       const dataString = JSON.stringify(data);
-      const encrypted = await this.encryptWithDerivedKey(dataString, this.activeKey);
+      const encrypted = await this.encryptWithDerivedKey(dataString, this.activeKey, this.activeKeySalt);
       
       if (typeof window !== 'undefined' && window.localStorage) {
         window.localStorage.setItem(ENCRYPTED_DATA_KEY, encrypted);
@@ -132,6 +132,7 @@ class SecurityService {
     }
     this.isUnlocked = true;
     this.activeKey = null;
+    this.activeKeySalt = null;
   }
 
   // -------------------------------------------------------------
@@ -179,6 +180,7 @@ class SecurityService {
     // 2. Tạo khóa mã hóa
     const key = await this.deriveKey(password, salt);
     this.activeKey = key; // Lưu lại trong phiên hiện tại
+    this.activeKeySalt = salt;
 
     // 3. Tiến hành mã hóa AES-GCM
     const ciphertext = await crypto.subtle.encrypt(
@@ -192,7 +194,11 @@ class SecurityService {
   }
 
   // Mã hóa nhanh bằng khóa đã có sẵn
-  async encryptWithDerivedKey(plaintext, key) {
+  async encryptWithDerivedKey(plaintext, key, salt) {
+    if (!salt) {
+      throw new Error('Missing derived key salt for encryption');
+    }
+
     const crypto = globalThis.crypto;
     const encoder = new TextEncoder();
     
@@ -203,9 +209,7 @@ class SecurityService {
       encoder.encode(plaintext)
     );
 
-    // Lưu trữ không cần salt mới vì khóa không đổi, ta truyền một dummy salt rỗng
-    const dummySalt = new Uint8Array(16);
-    return `${bufferToBase64(dummySalt)}.${bufferToBase64(iv)}.${bufferToBase64(ciphertext)}`;
+    return `${bufferToBase64(salt)}.${bufferToBase64(iv)}.${bufferToBase64(ciphertext)}`;
   }
 
   // Giải mã chuỗi mã hóa bằng password
@@ -225,6 +229,7 @@ class SecurityService {
     // Tạo khóa giải mã từ password và salt ban đầu
     const key = await this.deriveKey(password, salt);
     this.activeKey = key; // Lưu lại trong phiên hiện tại
+    this.activeKeySalt = salt;
 
     // Tiến hành giải mã
     const decryptedBuffer = await crypto.subtle.decrypt(

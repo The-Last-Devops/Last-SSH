@@ -34,6 +34,23 @@ const generateUniqueId = (prefix) => {
   return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
 };
 
+const savePlainAppState = ({ connections = [], keys = [], identities = [] }) => {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  localStorage.setItem(STORAGE_KEYS.CONNECTIONS_PLAIN, JSON.stringify(connections));
+  localStorage.setItem(STORAGE_KEYS.KEYS_PLAIN, JSON.stringify(keys));
+  localStorage.setItem(STORAGE_KEYS.IDENTITIES_PLAIN, JSON.stringify(identities));
+};
+
+const saveEncryptedAppState = async (appState) => {
+  if (!securityService.hasPIN() || !securityService.isUnlocked) return;
+
+  try {
+    await securityService.saveSecureData(appState);
+  } catch (e) {
+    console.error('Không thể đồng bộ mã hóa app state:', e);
+  }
+};
+
 export default function App() {
   // 1. Trạng thái Khóa bảo mật (Security State)
   const [isLocked, setIsLocked] = useState(false);
@@ -52,6 +69,25 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isP2PSyncOpen, setIsP2PSyncOpen] = useState(false);
   const [isSftpOpenMap, setIsSftpOpenMap] = useState({}); // tabId -> boolean
+
+  const persistAppState = async (appState) => {
+    const nextState = {
+      settings,
+      connections,
+      keys,
+      identities,
+      ...appState
+    };
+
+    if (securityService.hasPIN()) {
+      await saveEncryptedAppState(nextState);
+    } else {
+      savePlainAppState(nextState);
+    }
+  };
+
+
+
 
 
 
@@ -215,14 +251,8 @@ export default function App() {
     setSettings(updated);
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(updated));
 
-    // Nếu đã bật PIN, tự động mã hóa lưu settings
     if (securityService.hasPIN() && securityService.isUnlocked) {
-      securityService.saveSecureData({
-        connections: connections,
-        settings: updated,
-        keys: keys,
-        identities: identities
-      }).catch(e => console.error('Lỗi đồng bộ mã hóa settings:', e));
+      persistAppState({ settings: updated }).catch(e => console.error('Lỗi đồng bộ mã hóa settings:', e));
     }
   };
 
@@ -232,7 +262,7 @@ export default function App() {
     const updated = [...connections, profile];
     setConnections(updated);
 
-    await saveConnectionsState(updated);
+    await persistAppState({ connections: updated });
   };
 
   // Sửa kết nối SSH
@@ -240,7 +270,7 @@ export default function App() {
     const updated = connections.map(c => c.id === id ? { ...c, ...updatedProfile } : c);
     setConnections(updated);
 
-    await saveConnectionsState(updated);
+    await persistAppState({ connections: updated });
   };
 
   // Xóa kết nối SSH
@@ -248,27 +278,7 @@ export default function App() {
     const updated = connections.filter(c => c.id !== id);
     setConnections(updated);
 
-    await saveConnectionsState(updated);
-  };
-
-  // Ghi tệp lưu trữ kết nối SSH (Tự động lựa chọn Plain hoặc Encrypted)
-  const saveConnectionsState = async (connectionsList) => {
-    if (securityService.hasPIN()) {
-      if (securityService.isUnlocked) {
-        try {
-          await securityService.saveSecureData({
-            connections: connectionsList,
-            settings: settings,
-            keys: keys,
-            identities: identities
-          });
-        } catch (e) {
-          console.error('Không thể đồng bộ mã hóa connections:', e);
-        }
-      }
-    } else {
-      localStorage.setItem(STORAGE_KEYS.CONNECTIONS_PLAIN, JSON.stringify(connectionsList));
-    }
+    await persistAppState({ connections: updated });
   };
 
   // -------------------------------------------------------------
@@ -279,48 +289,31 @@ export default function App() {
     const currentKeys = Array.isArray(keys) ? keys : [];
     const updated = [...currentKeys, keyProfile];
     setKeys(updated);
-    await saveKeysState(updated);
+
+    await persistAppState({ keys: updated });
   };
 
   const handleEditKey = async (id, updatedKey) => {
     const currentKeys = Array.isArray(keys) ? keys : [];
     const updated = currentKeys.map(k => k.id === id ? { ...k, ...updatedKey } : k);
     setKeys(updated);
-    await saveKeysState(updated);
+
+    await persistAppState({ keys: updated });
   };
 
   const handleDeleteKey = async (id) => {
-    // Xóa liên kết khóa ở các connection profile
     const currentConns = Array.isArray(connections) ? connections : [];
     const updatedConns = currentConns.map(c => c.keyId === id ? { ...c, keyId: '' } : c);
     if (JSON.stringify(updatedConns) !== JSON.stringify(connections)) {
       setConnections(updatedConns);
-      await saveConnectionsState(updatedConns);
+      await persistAppState({ connections: updatedConns });
     }
 
     const currentKeys = Array.isArray(keys) ? keys : [];
     const updated = currentKeys.filter(k => k.id !== id);
     setKeys(updated);
-    await saveKeysState(updated);
-  };
 
-  const saveKeysState = async (keysList) => {
-    if (securityService.hasPIN()) {
-      if (securityService.isUnlocked) {
-        try {
-          await securityService.saveSecureData({
-            connections: connections,
-            settings: settings,
-            keys: keysList,
-            identities: identities
-          });
-        } catch (e) {
-          console.error('Không thể đồng bộ mã hóa keys:', e);
-        }
-      }
-    } else {
-      localStorage.setItem(STORAGE_KEYS.KEYS_PLAIN, JSON.stringify(keysList));
-    }
+    await persistAppState({ keys: updated });
   };
 
   // -------------------------------------------------------------
@@ -331,7 +324,8 @@ export default function App() {
     const currentIdentities = Array.isArray(identities) ? identities : [];
     const updated = [...currentIdentities, identityProfile];
     setIdentities(updated);
-    await saveIdentitiesState(updated);
+
+    await persistAppState({ identities: updated });
   };
 
   // eslint-disable-next-line no-unused-vars
@@ -339,41 +333,23 @@ export default function App() {
     const currentIdentities = Array.isArray(identities) ? identities : [];
     const updated = currentIdentities.map(i => i.id === id ? { ...i, ...updatedIdentity } : i);
     setIdentities(updated);
-    await saveIdentitiesState(updated);
+
+    await persistAppState({ identities: updated });
   };
 
   const handleDeleteIdentity = async (id) => {
-    // Xóa liên kết identity ở các connection profile
     const currentConns = Array.isArray(connections) ? connections : [];
     const updatedConns = currentConns.map(c => c.identityId === id ? { ...c, identityId: '' } : c);
     if (JSON.stringify(updatedConns) !== JSON.stringify(connections)) {
       setConnections(updatedConns);
-      await saveConnectionsState(updatedConns);
+      await persistAppState({ connections: updatedConns });
     }
 
     const currentIdentities = Array.isArray(identities) ? identities : [];
     const updated = currentIdentities.filter(i => i.id !== id);
     setIdentities(updated);
-    await saveIdentitiesState(updated);
-  };
 
-  const saveIdentitiesState = async (identitiesList) => {
-    if (securityService.hasPIN()) {
-      if (securityService.isUnlocked) {
-        try {
-          await securityService.saveSecureData({
-            connections: connections,
-            settings: settings,
-            keys: keys,
-            identities: identitiesList
-          });
-        } catch (e) {
-          console.error('Không thể đồng bộ mã hóa identities:', e);
-        }
-      }
-    } else {
-      localStorage.setItem(STORAGE_KEYS.IDENTITIES_PLAIN, JSON.stringify(identitiesList));
-    }
+    await persistAppState({ identities: updated });
   };
 
   // -------------------------------------------------------------
