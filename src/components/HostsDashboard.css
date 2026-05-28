@@ -761,7 +761,7 @@
 .dashboard-details-pane {
   position: absolute;
   top: 0;
-  right: -380px; /* Hidden offscreen by default */
+  right: 0;
   width: 360px;
   height: 100%;
   background: var(--termius-dark-pane);
@@ -770,12 +770,13 @@
   z-index: 100;
   display: flex;
   flex-direction: column;
-  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
 }
 
 .dashboard-details-pane.open {
-  right: 0;
+  transform: translateX(0);
 }
 
 .pane-header {
