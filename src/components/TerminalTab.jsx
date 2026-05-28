@@ -66,12 +66,14 @@ export default function TerminalTab({
   // ENGINE 1: DUAL ENGINE DESKTOP APP (Xterm.js + Electron SSH2 thật)
   // --------------------------------------------------------------------------
   const xtermRef = useRef(null);
+  const fitAddonRef = useRef(null);
   const terminalInstanceRef = useRef(null);
   const connectionActiveRef = useRef(false); // Guard chống double-connect
+  const resizeObserverRef = useRef(null);
 
   useEffect(() => {
-    // Chỉ kích hoạt SSH thật nếu chạy trong Electron Desktop App và tab là SSH
-    if (!isDesktop || !xtermRef.current || tab.type !== 'ssh') return;
+    // Chỉ kích hoạt terminal thật nếu chạy trong Electron Desktop App và tab là SSH hoặc LOCAL
+    if (!isDesktop || !xtermRef.current || (tab.type !== 'ssh' && tab.type !== 'local')) return;
     // Guard: tránh double-connect do React StrictMode hoặc re-render
     if (connectionActiveRef.current) return;
     connectionActiveRef.current = true;
@@ -111,6 +113,7 @@ export default function TerminalTab({
     });
 
     const fitAddon = new FitAddon();
+    fitAddonRef.current = fitAddon;
     term.loadAddon(fitAddon);
     term.open(xtermRef.current);
     terminalInstanceRef.current = term;
@@ -123,7 +126,11 @@ export default function TerminalTab({
           // Sau khi fit, notify server về kích thước thật để top/vim hiển đúng
           const { cols, rows } = term;
           if (cols > 0 && rows > 0) {
-            window.electronAPI.resizeSSH({ cols, rows });
+            if (tab.type === 'ssh') {
+              window.electronAPI.resizeSSH({ cols, rows });
+            } else if (tab.type === 'local') {
+              window.electronAPI.resizeLocal({ tabId: tab.id, cols, rows });
+            }
           }
         }
       } catch {
@@ -131,31 +138,69 @@ export default function TerminalTab({
       }
     };
 
-    // Gọi fit sau 2 animation frames để đảm bảo layout đã hoàn tất
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        fitSafely();
-      });
+    // ResizeObserver để xử lý khi pane nội dung thay đổi kích thước (ví dụ: mở/đóng SFTP)
+    const resizeObserver = new ResizeObserver(() => {
+      fitSafely();
     });
+    resizeObserver.observe(xtermRef.current);
+    resizeObserverRef.current = resizeObserver;
+
+    let fitTimeout1 = null;
+    let fitTimeout2 = null;
+    const scheduleFit = () => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          fitSafely();
+        });
+      });
+      fitTimeout1 = window.setTimeout(fitSafely, 120);
+      fitTimeout2 = window.setTimeout(fitSafely, 320);
+    };
+
+    scheduleFit();
+
+    let removeDataListener = () => {};
+    let removeCloseListener = () => {};
 
     // Đăng ký luồng nhận dữ liệu từ Electron truyền lên
-    const removeSSHListener = window.electronAPI.onSSHData((data) => {
-      term.write(data);
-    });
+    if (tab.type === 'ssh') {
+      removeDataListener = window.electronAPI.onSSHData((data) => {
+        term.write(data);
+      });
 
-    // Lắng nghe đóng kết nối SSH
-    const removeCloseListener = window.electronAPI.onSSHClose(() => {
-      term.write('\r\n\x1b[1;31m[SSH] Kết nối bị đóng bởi server từ xa.\x1b[0m\r\n');
-    });
+      // Lắng nghe đóng kết nối SSH
+      removeCloseListener = window.electronAPI.onSSHClose(() => {
+        term.write('\r\n\x1b[1;31m[SSH] Kết nối bị đóng bởi server từ xa.\x1b[0m\r\n');
+      });
+    } else if (tab.type === 'local') {
+      removeDataListener = window.electronAPI.onLocalData((payload) => {
+        if (payload.tabId === tab.id) {
+          term.write(payload.data);
+        }
+      });
+
+      removeCloseListener = window.electronAPI.onLocalClose((closedTabId) => {
+        if (closedTabId === tab.id) {
+          term.write('\r\n\x1b[1;31m[Local shell đã đóng]\x1b[0m\r\n');
+        }
+      });
+    }
 
     // Đăng ký luồng gõ phím từ Xterm gửi xuống Electron qua IPC
     const onDataDisposable = term.onData((data) => {
-      window.electronAPI.writeSSHData(data);
+      if (tab.type === 'ssh') {
+        window.electronAPI.writeSSHData(data);
+      } else if (tab.type === 'local') {
+        window.electronAPI.writeLocalData(tab.id, data);
+      }
     });
 
-    // Kích hoạt bắt tay kết nối SSH thật
-    // Lấy thông tin connection profile bao gồm cả nội dung Key nếu có
-    window.electronAPI.connectSSH(tab.connectionProfile);
+    // Kết nối đến SSH hoặc Local shell thật
+    if (tab.type === 'ssh') {
+      window.electronAPI.connectSSH(tab.connectionProfile);
+    } else if (tab.type === 'local') {
+      window.electronAPI.connectLocalShell({ tabId: tab.id });
+    }
 
     // Xử lý co giãn terminal khi thay đổi kích thước cửa sổ
     const handleResize = () => {
@@ -169,8 +214,17 @@ export default function TerminalTab({
     return () => {
       connectionActiveRef.current = false; // Reset guard khi unmount
       window.removeEventListener('resize', handleResize);
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+      }
+      if (fitTimeout1) {
+        window.clearTimeout(fitTimeout1);
+      }
+      if (fitTimeout2) {
+        window.clearTimeout(fitTimeout2);
+      }
       onDataDisposable.dispose();
-      removeSSHListener();
+      removeDataListener();
       removeCloseListener();
       term.dispose();
     };
@@ -189,7 +243,7 @@ export default function TerminalTab({
   const endRef = useRef(null);
 
   const handleContainerClick = () => {
-    if (isDesktop && tab.type === 'ssh') {
+    if (isDesktop && (tab.type === 'ssh' || tab.type === 'local')) {
       if (terminalInstanceRef.current) {
         terminalInstanceRef.current.focus();
       }
@@ -205,7 +259,7 @@ export default function TerminalTab({
   };
 
   useEffect(() => {
-    if (isDesktop && tab.type === 'ssh') return;
+    if (isDesktop && (tab.type === 'ssh' || tab.type === 'local')) return;
     if (endRef.current) {
       endRef.current.scrollIntoView({ behavior: 'smooth' });
     }
@@ -402,7 +456,7 @@ export default function TerminalTab({
   // --------------------------------------------------------------------------
   // RENDER DUAL ENGINES
   // --------------------------------------------------------------------------
-  if (isDesktop && tab.type === 'ssh') {
+  if (isDesktop && (tab.type === 'ssh' || tab.type === 'local')) {
     return (
       <div 
         ref={xtermRef} 

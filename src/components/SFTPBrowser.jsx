@@ -63,6 +63,25 @@ export default function SFTPBrowser({
       return;
     }
 
+    let isMounted = true;
+
+    const checkStatus = async () => {
+      try {
+        const status = await window.electronAPI.sftpStatus();
+        if (isMounted && status && status.ready) {
+          setIsSftpReady(true);
+          setSftpError(null);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setSftpError(err.message);
+          setIsSftpReady(false);
+        }
+      }
+    };
+
+    checkStatus();
+
     // Subscribe listener sftp-ready
     const removeSftpReadyListener = window.electronAPI.onSFTPReady((result) => {
       if (result && result.success) {
@@ -75,6 +94,7 @@ export default function SFTPBrowser({
     });
 
     return () => {
+      isMounted = false;
       removeSftpReadyListener();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

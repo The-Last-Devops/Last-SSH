@@ -1,11 +1,14 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { Client } = require('ssh2');
+const pty = require('node-pty');
 
 let mainWindow = null;
 
 // Hỗ trợ nhiều SSH session song song theo tabId
 const sshSessions = {}; // tabId -> { client, stream, sftp }
+const localSessions = {}; // tabId -> pty process
 
 // Legacy globals để tương thích với SFTP operations cũ (sẽ dùng session mới nhất)
 let activeSSHClient = null;
@@ -70,6 +73,17 @@ function cleanupSession(tabId) {
     activeShellStream = null;
     activeSFTP = null;
   }
+}
+
+function cleanupLocalSession(tabId) {
+  const session = localSessions[tabId];
+  if (!session) return;
+
+  try {
+    session.kill();
+  } catch (_e) { /* ignore */ }
+
+  delete localSessions[tabId];
 }
 
 function cleanupSSH() {
@@ -247,15 +261,95 @@ ipcMain.on('ssh-disconnect', (event, tabId) => {
   cleanupSession(tabId || 'default');
 });
 
-// Thay đổi kích thước terminal (cols x rows) - cần thiết để top/vim hiển thị đúng
-ipcMain.on('ssh-resize', (event, { cols, rows }) => {
-  if (activeShellStream && cols > 0 && rows > 0) {
+ipcMain.on('local-shell-connect', (event, { tabId, cwd, shell }) => {
+  const sessionTabId = tabId || 'local-default';
+
+  if (localSessions[sessionTabId]) {
+    cleanupLocalSession(sessionTabId);
+  }
+
+  const shellCandidates = [];
+  if (shell) shellCandidates.push(shell);
+  if (process.env.SHELL) shellCandidates.push(process.env.SHELL);
+  if (process.platform === 'win32') {
+    shellCandidates.push('powershell.exe', 'cmd.exe');
+  } else {
+    shellCandidates.push('/bin/zsh', '/bin/bash', '/bin/sh');
+  }
+
+  const userShell = shellCandidates.find((candidate) => {
     try {
-      activeShellStream.setWindow(rows, cols, 0, 0);
+      return fs.existsSync(candidate);
+    } catch (_e) {
+      return false;
+    }
+  }) || shellCandidates[shellCandidates.length - 1];
+
+  const cwdPath = cwd || process.env.HOME || process.cwd();
+  const shellEnv = {
+    ...process.env,
+    TERM: process.env.TERM || 'xterm-256color',
+    COLORTERM: process.env.COLORTERM || 'truecolor'
+  };
+
+  let ptyProcess;
+  try {
+    ptyProcess = pty.spawn(userShell, [], {
+      name: 'xterm-256color',
+      cols: 80,
+      rows: 24,
+      cwd: cwdPath,
+      env: shellEnv
+    });
+  } catch (err) {
+    const message = String(err.message || err);
+    if (mainWindow) {
+      mainWindow.webContents.send('local-data', { tabId: sessionTabId, data: `\r\n\x1b[1;31m[Local shell failed to start: ${message}]\x1b[0m\r\n` });
+    }
+    return;
+  }
+
+  localSessions[sessionTabId] = ptyProcess;
+
+  ptyProcess.on('data', (data) => {
+    if (mainWindow) {
+      mainWindow.webContents.send('local-data', { tabId: sessionTabId, data });
+    }
+  });
+
+  ptyProcess.on('exit', (exitCode) => {
+    if (mainWindow) {
+      mainWindow.webContents.send('local-data', { tabId: sessionTabId, data: `\r\n\x1b[1;30m[Local shell exited with code ${exitCode}]\x1b[0m\r\n` });
+      mainWindow.webContents.send('local-close', sessionTabId);
+    }
+    cleanupLocalSession(sessionTabId);
+  });
+});
+
+ipcMain.on('local-write', (event, { tabId, data }) => {
+  const session = localSessions[tabId];
+  if (session) {
+    try {
+      session.write(data);
+    } catch (_e) {
+      console.error('Lỗi ghi dữ liệu local shell:', _e.message);
+    }
+  }
+});
+
+ipcMain.on('local-resize', (event, { tabId, cols, rows }) => {
+  const session = localSessions[tabId];
+  if (session && cols > 0 && rows > 0) {
+    try {
+      session.resize(cols, rows);
     } catch (_e) {
       // Ignore resize errors
     }
   }
+});
+
+ipcMain.on('local-disconnect', (event, tabId) => {
+  cleanupLocalSession(tabId);
 });
 
 // --------------------------------------------------------------------------
@@ -365,4 +459,10 @@ ipcMain.handle('sftp-rm', async (event, remotePath, name) => {
       });
     });
   });
+});
+
+// 6. Kiểm tra trạng thái SFTP hiện tại
+ipcMain.handle('sftp-status', async () => {
+  const sftp = getActiveSFTP();
+  return { ready: !!sftp };
 });

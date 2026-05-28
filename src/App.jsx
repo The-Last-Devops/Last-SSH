@@ -448,9 +448,9 @@ export default function App() {
     setIsLocked(false);
     setIsSftpOpenMap({});
     
-    // Đóng toàn bộ tab và mở lại tab local rỗng
+    // Đóng toàn bộ tab, trở về Hosts Dashboard.
     setTabs([]);
-    openNewLocalTab();
+    setActiveTabId('hosts-dashboard');
   };
 
   // -------------------------------------------------------------
@@ -534,20 +534,8 @@ export default function App() {
         }
       }
 
-      // Khởi tạo Tab Local đầu tiên ngầm
-      const tabId = generateUniqueId('tab-local');
-      const newTab = {
-        id: tabId,
-        title: 'Local terminal',
-        type: 'local',
-        currentPath: '/home/user',
-        history: [
-          { type: 'system', text: 'Welcome to Last SSH (React + Vite) v1.0.0.' },
-          { type: 'system', text: "Type 'help' to see simulated commands, or 'neofetch' for system info." }
-        ],
-        commandHistory: []
-      };
-      setTabs([newTab]);
+      // Khởi động ứng dụng với Hosts Dashboard hiển thị, local terminal mở khi người dùng cần.
+      setTabs([]);
       setActiveTabId('hosts-dashboard');
     };
     bootstrap();
@@ -646,6 +634,7 @@ export default function App() {
                   onEditConnection={handleEditConnection}
                   onDeleteConnection={handleDeleteConnection}
                   onConnectSSH={handleConnectSSH}
+                  onOpenLocalTerminal={openNewLocalTab}
                   onAddKey={handleAddKey}
                   onDeleteKey={handleDeleteKey}
                   onAddIdentity={handleAddIdentity}

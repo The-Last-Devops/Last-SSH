@@ -44,6 +44,7 @@ export default function HostsDashboard({
   onEditConnection,
   onDeleteConnection,
   onConnectSSH,
+  onOpenLocalTerminal,
   onAddKey,
   onDeleteKey,
   onAddIdentity,
@@ -100,8 +101,19 @@ export default function HostsDashboard({
     existingGroups.push('Servers');
   }
 
-  // Lọc danh sách máy chủ theo tìm kiếm
-  const filteredHosts = (Array.isArray(connections) ? connections : []).filter(conn => {
+  const localHost = {
+    id: 'local-host',
+    label: 'Local terminal',
+    host: 'localhost',
+    port: 'local',
+    username: 'local',
+    group: 'Servers',
+    tags: ['local'],
+    local: true
+  };
+
+  // Lọc danh sách máy chủ theo tìm kiếm, bao gồm local terminal như một host cố định
+  const filteredHosts = [localHost, ...(Array.isArray(connections) ? connections : [])].filter(conn => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
     return (
@@ -125,6 +137,11 @@ export default function HostsDashboard({
 
   // Xử lý Click vào host trong danh sách
   const handleHostClick = (host) => {
+    if (host.id === 'local-host') {
+      onOpenLocalTerminal?.();
+      return;
+    }
+
     // Nếu trong môi trường E2E test, click đơn sẽ tự động mở kết nối SSH để tương thích test cũ
     if (typeof window !== 'undefined' && window.__e2e__) {
       onConnectSSH(host);
@@ -155,6 +172,10 @@ export default function HostsDashboard({
   };
 
   const handleHostDoubleClick = (host) => {
+    if (host.id === 'local-host') {
+      onOpenLocalTerminal?.();
+      return;
+    }
     onConnectSSH(host);
   };
 
@@ -561,12 +582,12 @@ export default function HostsDashboard({
                               title="Double click to connect instantly"
                             >
                               <div className="host-card-icon">
-                                <UbuntuIcon />
+                                {conn.local ? <Laptop /> : <UbuntuIcon />}
                               </div>
                               <div className="host-card-info">
                                 <div className="host-card-label">{conn.label}</div>
                                 <div className="host-card-sub">
-                                  ssh, {conn.username}@{conn.host}:{conn.port}
+                                  {conn.local ? 'Local shell on this machine' : `ssh, ${conn.username}@${conn.host}:${conn.port}`}
                                 </div>
                               </div>
                               {conn.tags && conn.tags.length > 0 && (
@@ -872,8 +893,8 @@ export default function HostsDashboard({
       </div>
 
       {/* CỘT 3: Right Host Details Pane */}
-      <div className={`dashboard-details-pane ${isPaneOpen ? 'open' : ''}`}>
-        {isPaneOpen && (
+      {isPaneOpen && (
+        <div className="dashboard-details-pane">
           <>
             <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', paddingBottom: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1211,8 +1232,8 @@ export default function HostsDashboard({
               </div>
             </form>
           </>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

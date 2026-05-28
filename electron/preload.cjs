@@ -16,12 +16,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('ssh-close', subscription);
   },
 
+  connectLocalShell: (payload) => ipcRenderer.send('local-shell-connect', payload),
+  onLocalData: (callback) => {
+    const subscription = (event, payload) => callback(payload);
+    ipcRenderer.on('local-data', subscription);
+    return () => ipcRenderer.removeListener('local-data', subscription);
+  },
+  writeLocalData: (tabId, data) => ipcRenderer.send('local-write', { tabId, data }),
+  resizeLocal: (payload) => ipcRenderer.send('local-resize', payload),
+  onLocalClose: (callback) => {
+    const subscription = (event, tabId) => callback(tabId);
+    ipcRenderer.on('local-close', subscription);
+    return () => ipcRenderer.removeListener('local-close', subscription);
+  },
+
   // Thông báo SFTP đã sẵn sàng
   onSFTPReady: (callback) => {
     const subscription = (event, result) => callback(result);
     ipcRenderer.on('sftp-ready', subscription);
     return () => ipcRenderer.removeListener('sftp-ready', subscription);
   },
+
+  sftpStatus: () => ipcRenderer.invoke('sftp-status'),
 
   // Lệnh SFTP
   sftpList: (remotePath) => ipcRenderer.invoke('sftp-list', remotePath),

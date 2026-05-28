@@ -27,12 +27,56 @@
 /* Main Area Layout */
 .main-content {
   flex-grow: 1;
+  min-height: 0;
   height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   position: relative;
   background: rgba(0, 0, 0, 0.05);
+}
+
+.content-frame {
+  min-height: 0;
+  min-width: 0;
+  flex-grow: 1;
+  width: 100%;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Split Pane: Terminal + SFTP Side-by-Side */
+.split-pane {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  min-height: 0;
+  min-width: 0;
+}
+
+.terminal-pane {
+  flex-grow: 1;
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.sftp-pane {
+  width: 380px;
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  border-left: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(4px);
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Header & Tab Area */
