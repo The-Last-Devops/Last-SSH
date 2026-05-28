@@ -55,4 +55,8 @@ File cài đặt thành phẩm (như `.dmg`, `.exe`, `.AppImage`) sẽ được 
 
 Dự án đã được tích hợp sẵn Workflow GitHub Actions. 
 - Bất cứ khi nào bạn **push code** lên nhánh `main` hoặc tạo một **Pull Request**, GitHub Actions sẽ tự động thực hiện tiến trình build song song trên 3 hệ điều hành: Windows, macOS và Ubuntu.
-- Bạn có thể tải các bản build thành phẩm tại phần **Artifacts** trong tab **Actions** của GitHub repository.
+- Mỗi lần build thành công trên nhánh `main`, workflow sẽ tự động tạo một GitHub Release với các file đã đóng gói.
+- Người dùng có thể tải bản build mới nhất tại trang releases:
+  `https://github.com/<owner>/<repo>/releases/latest`
+
+> Thay `<owner>/<repo>` bằng đường dẫn repository thực tế của bạn.

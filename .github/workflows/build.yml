@@ -56,3 +56,44 @@ jobs:
             dist-electron/*.deb
             dist-electron/*.zip
           retention-days: 7
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Linux build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: last-ssh-ubuntu-latest
+          path: release-assets/linux
+
+      - name: Download macOS build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: last-ssh-macos-latest
+          path: release-assets/macos
+
+      - name: Download Windows build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: last-ssh-windows-latest
+          path: release-assets/windows
+
+      - name: Publish release with assets
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: last-ssh-${{ github.run_number }}
+          name: Last SSH Build #${{ github.run_number }}
+          body: |
+            Automated build from commit `${{ github.sha }}` on branch `${{ github.ref_name }}`.
+            Download links are available as release assets.
+          files: |
+            release-assets/linux/*
+            release-assets/macos/*
+            release-assets/windows/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
