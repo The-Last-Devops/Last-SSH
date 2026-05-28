@@ -3,7 +3,12 @@ import { shellEngine } from '../services/shellEngine.js';
 import { sshSimulator } from '../services/sshSimulator.js';
 import './TerminalTab.css';
 
-// Custom ANSI color parser
+// Thư viện Terminal chuẩn cho SSH thật
+import { Terminal } from 'xterm';
+import { FitAddon } from 'xterm-addon-fit';
+import 'xterm/css/xterm.css';
+
+// Custom ANSI color parser (Dùng cho Simulated Engine)
 function parseAnsi(text) {
   if (typeof text !== 'string') return text;
   
@@ -55,6 +60,85 @@ export default function TerminalTab({
   onUpdateTab,
   onSwitchToSFTP
 }) {
+  const isDesktop = typeof window !== 'undefined' && window.electronAPI !== undefined;
+
+  // --------------------------------------------------------------------------
+  // ENGINE 1: DUAL ENGINE DESKTOP APP (Xterm.js + Electron SSH2 thật)
+  // --------------------------------------------------------------------------
+  const xtermRef = useRef(null);
+  const terminalInstanceRef = useRef(null);
+
+  useEffect(() => {
+    // Chỉ kích hoạt SSH thật nếu chạy trong Electron Desktop App và tab là SSH
+    if (!isDesktop || !xtermRef.current || tab.type !== 'ssh') return;
+
+    // Khởi tạo Xterm.js
+    const term = new Terminal({
+      cursorBlink: true,
+      fontFamily: settings.fontFamily || 'Fira Code',
+      fontSize: settings.fontSize || 14,
+      cursorStyle: settings.cursorStyle || 'block',
+      theme: {
+        background: '#1a1e29', // Termius Dark theme màu nền
+        foreground: '#e1e6eb',
+        cursor: '#007eff',
+        selectionBackground: 'rgba(0, 126, 255, 0.3)'
+      }
+    });
+
+    const fitAddon = new FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(xtermRef.current);
+    fitAddon.fit();
+    terminalInstanceRef.current = term;
+
+    // Đăng ký luồng nhận dữ liệu từ Electron truyền lên
+    const removeSSHListener = window.electronAPI.onSSHData((data) => {
+      term.write(data);
+    });
+
+    // Lắng nghe đóng kết nối SSH
+    const removeCloseListener = window.electronAPI.onSSHClose(() => {
+      term.write('\r\n\x1b[1;31m[SSH] Kết nối bị đóng bởi server từ xa.\x1b[0m\r\n');
+    });
+
+    // Đăng ký luồng gõ phím từ Xterm gửi xuống Electron qua IPC
+    const onDataDisposable = term.onData((data) => {
+      window.electronAPI.writeSSHData(data);
+    });
+
+    // Kích hoạt bắt tay kết nối SSH thật
+    // Lấy thông tin connection profile bao gồm cả nội dung Key nếu có
+    window.electronAPI.connectSSH(tab.connectionProfile);
+
+    // Xử lý co giãn terminal khi thay đổi kích thước cửa sổ
+    const handleResize = () => {
+      if (fitAddon) {
+        try {
+          fitAddon.fit();
+        } catch (e) {
+          console.error("Lỗi resize terminal:", e);
+        }
+      }
+    };
+    window.addEventListener('resize', handleResize);
+
+    // Focus tự động vào Xterm
+    term.focus();
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      onDataDisposable.dispose();
+      removeSSHListener();
+      removeCloseListener();
+      term.dispose();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab.id, isDesktop, tab.type]);
+
+  // --------------------------------------------------------------------------
+  // ENGINE 2: SIMULATED ENGINE (Dành cho Local Shell hoặc Web Browser thường / E2E Test)
+  // --------------------------------------------------------------------------
   const [inputValue, setInputValue] = useState('');
   const [historyPointer, setHistoryPointer] = useState(-1);
   const [autocompleteSuggestions, setAutocompleteSuggestions] = useState(null);
@@ -63,9 +147,13 @@ export default function TerminalTab({
   const inputRef = useRef(null);
   const endRef = useRef(null);
 
-  // Tập trung vào input khi click vào container
   const handleContainerClick = () => {
-    // Nếu người dùng đang bôi đen (chọn text), giữ nguyên lựa chọn và không ép focus làm mất selection
+    if (isDesktop && tab.type === 'ssh') {
+      if (terminalInstanceRef.current) {
+        terminalInstanceRef.current.focus();
+      }
+      return;
+    }
     const selection = window.getSelection();
     if (selection && selection.toString().trim() !== '') {
       return;
@@ -75,19 +163,18 @@ export default function TerminalTab({
     }
   };
 
-  // Tự động cuộn xuống cuối khi có log mới hoặc thay đổi input
   useEffect(() => {
+    if (isDesktop && tab.type === 'ssh') return;
     if (endRef.current) {
       endRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [tab.history, inputValue]);
+  }, [tab.history, inputValue, isDesktop, tab.type]);
 
-  // Luôn lấy focus khi chuyển tab
   useEffect(() => {
     handleContainerClick();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab.id]);
 
-  // Sinh prompt hiển thị dòng lệnh
   const renderPrompt = () => {
     if (tab.type === 'ssh') {
       const session = sshSimulator.getSession(tab.id);
@@ -99,8 +186,6 @@ export default function TerminalTab({
         );
       }
     }
-    
-    // Mặc định là Local Shell
     return (
       <span className="terminal-prompt">
         user@lastssh:{tab.currentPath} $
@@ -108,11 +193,9 @@ export default function TerminalTab({
     );
   };
 
-  // Xử lý phím đặc biệt (Enter, Up, Down, Tab)
   const handleKeyDown = async (e) => {
     const commandHistory = tab.commandHistory || [];
     
-    // 1. Phím Enter - Thực thi lệnh
     if (e.key === 'Enter') {
       e.preventDefault();
       const cmd = inputValue;
@@ -121,27 +204,22 @@ export default function TerminalTab({
       setAutocompleteSuggestions(null);
 
       if (!cmd.trim()) {
-        // Gõ Enter trống -> chỉ xuống dòng
         const newHistory = [...tab.history, { type: 'input', text: '', prompt: renderPrompt() }];
         onUpdateTab(tab.id, { history: newHistory });
         return;
       }
 
-      // Lưu lệnh vào lịch sử (không lưu trùng lệnh gần nhất)
       const newCmdHistory = [...commandHistory];
       if (newCmdHistory[newCmdHistory.length - 1] !== cmd) {
         newCmdHistory.push(cmd);
       }
 
-      // Đẩy lệnh vừa gõ vào dòng hiển thị
       let newHistory = [...tab.history, { type: 'input', text: cmd, prompt: renderPrompt() }];
 
-      // Thực thi lệnh dựa trên loại phiên tab (Local vs SSH)
       if (tab.type === 'ssh') {
         const res = sshSimulator.executeCommand(tab.id, cmd);
         
         if (res.exit) {
-          // Thoát SSH
           sshSimulator.closeSession(tab.id);
           newHistory.push({ type: 'system', text: '\r\n[SSH] Connection closed by remote host.' });
           
@@ -152,7 +230,7 @@ export default function TerminalTab({
             history: newHistory,
             commandHistory: newCmdHistory
           });
-          onSwitchToSFTP(tab.id, false); // Đóng bảng SFTP
+          onSwitchToSFTP(tab.id, false);
           return;
         }
 
@@ -166,7 +244,6 @@ export default function TerminalTab({
         });
 
       } else {
-        // Lệnh Local Shell
         const res = shellEngine.execute(tab.currentPath, cmd, settings.terminalTheme || settings.appTheme || 'Glass Aura');
 
         if (res.clear) {
@@ -177,17 +254,13 @@ export default function TerminalTab({
           return;
         }
 
-        // Xử lý đổi theme nhanh qua dòng lệnh 'theme <name>'
         if (res.stdout && res.stdout.startsWith('theme_change:')) {
           const themeName = res.stdout.split(':')[1];
-          // Gọi cấu hình theme thông qua settings (ta giả lập bằng callback)
           newHistory.push({ type: 'system', text: `Đã đổi theme sang '${themeName}'` });
-          // Cập nhật state ở App
           if (window.dispatchEvent) {
             window.dispatchEvent(new CustomEvent('change-theme-cmd', { detail: themeName }));
           }
         }
-        // Xử lý lệnh 'ssh' kết nối SSH
         else if (res.stdout && res.stdout.startsWith('ssh_connect:')) {
           const dest = res.stdout.split(':')[1];
           const [username, host] = dest.split('@');
@@ -205,9 +278,10 @@ export default function TerminalTab({
             title: `ssh: ${host}`,
             currentPath: `/home/${username}`,
             history: newHistory,
-            commandHistory: newCmdHistory
+            commandHistory: newCmdHistory,
+            connectionProfile: mockProfile
           });
-          onSwitchToSFTP(tab.id, true); // Mở bảng SFTP visual
+          onSwitchToSFTP(tab.id, true);
           return;
         } else {
           if (res.stdout) newHistory.push({ type: 'output', text: res.stdout });
@@ -222,7 +296,6 @@ export default function TerminalTab({
       }
     }
     
-    // 2. Phím Lên - Xem lệnh cũ hơn
     else if (e.key === 'ArrowUp') {
       e.preventDefault();
       if (commandHistory.length === 0) return;
@@ -235,7 +308,6 @@ export default function TerminalTab({
       setInputValue(commandHistory[newPointer]);
     }
     
-    // 3. Phím Xuống - Xem lệnh mới hơn
     else if (e.key === 'ArrowDown') {
       e.preventDefault();
       if (commandHistory.length === 0 || historyPointer === -1) return;
@@ -250,19 +322,11 @@ export default function TerminalTab({
       }
     }
     
-    // 4. Phím Tab - Gợi ý/Tự động hoàn thành
     else if (e.key === 'Tab') {
       e.preventDefault();
-      let suggestions;
-      if (tab.type === 'ssh') {
-        // Với SSH, chúng ta dùng bộ mock autocomplete đơn giản của shellEngine dựa trên currentPath ảo
-        suggestions = shellEngine.autocomplete(tab.currentPath, inputValue);
-      } else {
-        suggestions = shellEngine.autocomplete(tab.currentPath, inputValue);
-      }
+      let suggestions = shellEngine.autocomplete(tab.currentPath, inputValue);
 
       if (suggestions.completed) {
-        // Có gợi ý duy nhất -> Tự hoàn thành luôn
         const lastSpace = inputValue.lastIndexOf(' ');
         const completedText = lastSpace === -1 
           ? suggestions.completed 
@@ -271,13 +335,11 @@ export default function TerminalTab({
         setInputValue(completedText);
         setAutocompleteSuggestions(null);
       } else if (suggestions.matches.length > 1) {
-        // Nhiều gợi ý -> In ra danh sách để người dùng lựa chọn
         setAutocompleteSuggestions(suggestions.matches);
       }
     }
   };
 
-  // Định cấu hình font chữ động
   const getFontFamilyClass = () => {
     switch (settings.fontFamily) {
       case 'Fira Code': return 'font-firacode';
@@ -286,7 +348,6 @@ export default function TerminalTab({
     }
   };
 
-  // Xác định Class cho Cursor nhấp nháy
   const getCursorClass = () => {
     switch (settings.cursorStyle) {
       case 'underline': return 'cursor-blink-underline';
@@ -297,6 +358,26 @@ export default function TerminalTab({
 
   const terminalThemeClass = `theme-${(settings.terminalTheme || 'Glass Aura').toLowerCase().replace(/ /g, '-')}`;
 
+  // --------------------------------------------------------------------------
+  // RENDER DUAL ENGINES
+  // --------------------------------------------------------------------------
+  if (isDesktop && tab.type === 'ssh') {
+    return (
+      <div 
+        ref={xtermRef} 
+        className="xterm-terminal-container" 
+        onClick={handleContainerClick}
+        style={{
+          width: '100%',
+          height: '100%',
+          padding: '10px',
+          background: '#1a1e29',
+          overflow: 'hidden'
+        }}
+      />
+    );
+  }
+
   return (
     <div 
       className={`terminal-container ${terminalThemeClass} ${settings.crtEnabled ? 'crt-effect crt-flicker' : ''} ${getFontFamilyClass()}`}
@@ -304,7 +385,6 @@ export default function TerminalTab({
       ref={containerRef}
       style={{ fontSize: `${settings.fontSize || 14}px` }}
     >
-      {/* Cây lịch sử dòng lệnh */}
       <div className="terminal-history">
         {tab.history.map((line, idx) => {
           if (line.type === 'input') {
@@ -326,14 +406,12 @@ export default function TerminalTab({
         })}
       </div>
 
-      {/* Dòng autocomplete nếu có nhiều gợi ý */}
       {autocompleteSuggestions && (
         <div className="terminal-line type-system" style={{ marginTop: '8px', opacity: 0.8 }}>
           Gợi ý: {autocompleteSuggestions.join('   ')}
         </div>
       )}
 
-      {/* Dòng nhập liệu hiện tại */}
       <div className="terminal-input-row">
         {renderPrompt()}
         <span className="terminal-input-display">
@@ -342,7 +420,6 @@ export default function TerminalTab({
         </span>
       </div>
 
-      {/* Hộp input ẩn để nhận sự kiện gõ bàn phím */}
       <input 
         ref={inputRef}
         type="text" 

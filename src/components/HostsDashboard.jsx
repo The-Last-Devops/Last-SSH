@@ -39,12 +39,15 @@ const UbuntuIcon = () => (
 export default function HostsDashboard({
   connections = [],
   keys = [],
+  identities = [],
   onAddConnection,
   onEditConnection,
   onDeleteConnection,
   onConnectSSH,
   onAddKey,
   onDeleteKey,
+  onAddIdentity,
+  onDeleteIdentity,
   onOpenSettings,
   onOpenP2PSync
 }) {
@@ -77,6 +80,18 @@ export default function HostsDashboard({
   const [keyContent, setKeyContent] = useState('');
   const [showKeyForm, setShowKeyForm] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Identity Form States
+  const [identityLabel, setIdentityLabel] = useState('');
+  const [identityUsername, setIdentityUsername] = useState('');
+  const [identityAuthType, setIdentityAuthType] = useState('password'); // 'password' or 'key'
+  const [identityPassword, setIdentityPassword] = useState('');
+  const [identityKeyId, setIdentityKeyId] = useState('');
+  const [showIdentityForm, setShowIdentityForm] = useState(false);
+  const [showIdentityPassword, setShowIdentityPassword] = useState(false);
+
+  // Host Identity State
+  const [hostIdentityId, setHostIdentityId] = useState('');
 
   // Gom nhóm danh sách các Group hiện có để đưa vào dropdown select
   const existingGroups = Array.from(new Set((connections || []).map(conn => conn.group || 'Servers')));
@@ -132,6 +147,7 @@ export default function HostsDashboard({
 
     setHostTags((host.tags || []).join(', '));
     setHostKeyId(host.keyId || '');
+    setHostIdentityId(host.identityId || '');
     
     setIsPaneOpen(true);
   };
@@ -153,6 +169,7 @@ export default function HostsDashboard({
 
     setHostTags('');
     setHostKeyId('');
+    setHostIdentityId('');
     
     setIsPaneOpen(true);
   };
@@ -186,7 +203,8 @@ export default function HostsDashboard({
       group: finalGroup || 'Servers',
       tags: tagsArray,
       tagColor: 'var(--accent)',
-      keyId: hostKeyId
+      keyId: hostKeyId,
+      identityId: hostIdentityId
     };
 
     if (isNewHostMode) {
@@ -218,10 +236,33 @@ export default function HostsDashboard({
       port: hostPort,
       username: hostUsername,
       password: hostPassword,
-      keyId: hostKeyId
+      keyId: hostKeyId,
+      identityId: hostIdentityId
     };
     
     onConnectSSH(hostData);
+  };
+
+  const handleAddIdentitySubmit = (e) => {
+    e.preventDefault();
+    if (!identityLabel.trim() || !identityUsername.trim()) {
+      alert('Vui lòng điền đầy đủ nhãn định danh và SSH username!');
+      return;
+    }
+
+    onAddIdentity({
+      label: identityLabel.trim(),
+      username: identityUsername.trim(),
+      authType: identityAuthType,
+      password: identityAuthType === 'password' ? identityPassword : '',
+      keyId: identityAuthType === 'key' ? identityKeyId : ''
+    });
+
+    setIdentityLabel('');
+    setIdentityUsername('');
+    setIdentityPassword('');
+    setIdentityKeyId('');
+    setShowIdentityForm(false);
   };
 
   // Nhập Key từ file
@@ -541,97 +582,245 @@ export default function HostsDashboard({
           {/* TAB 2: KEYCHAIN VIEW */}
           {activeSubTab === 'keychain' && (
             <div className="keychain-view-container">
-              <div className="keychain-header">
-                <h2>Keychain Manager</h2>
-                <button 
-                  className="add-key-btn" 
-                  onClick={() => setShowKeyForm(!showKeyForm)}
-                >
-                  <Plus size={14} /> {showKeyForm ? 'Đóng Form' : 'Thêm Key Mới'}
-                </button>
-              </div>
+              <div className="keychain-grid-layout" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
+                
+                {/* PHẦN 1: KEYS MANAGER */}
+                <div className="keychain-section">
+                  <div className="keychain-header">
+                    <h2>Keys (Private Keys)</h2>
+                    <button 
+                      className="add-key-btn" 
+                      onClick={() => setShowKeyForm(!showKeyForm)}
+                      style={{ padding: '4px 8px', fontSize: '11px' }}
+                    >
+                      {showKeyForm ? 'Đóng' : 'Thêm Key'}
+                    </button>
+                  </div>
 
-              {showKeyForm && (
-                <form className="keychain-add-form" onSubmit={handleAddNewKeySubmit}>
-                  <h3>Thêm Private Key</h3>
-                  <div className="form-group">
-                    <label>Nhãn (Tên gợi nhớ)</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. My Ubuntu Server Key"
-                      value={keyLabel}
-                      onChange={(e) => setKeyLabel(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      Nội dung Private Key (PEM format)
-                      <button 
-                        type="button" 
-                        className="file-upload-btn-secondary"
-                        onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                      >
-                        <Upload size={12} style={{ marginRight: '4px' }} /> Chọn file .pem/.key
-                      </button>
-                    </label>
-                    <textarea 
-                      placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----"
-                      value={keyContent}
-                      onChange={(e) => setKeyContent(e.target.value)}
-                      rows={6}
-                      required
-                    />
-                    <input 
-                      type="file" 
-                      ref={fileInputRef} 
-                      style={{ display: 'none' }} 
-                      onChange={handleKeyFileChange}
-                      accept=".pem,.key,.txt,*"
-                    />
-                  </div>
-                  <div className="form-actions-row">
-                    <button type="submit" className="save-btn-primary">Lưu khóa</button>
-                    <button type="button" className="cancel-btn-secondary" onClick={() => setShowKeyForm(false)}>Hủy</button>
-                  </div>
-                </form>
-              )}
+                  {showKeyForm && (
+                    <form className="keychain-add-form animate-slide-down" onSubmit={handleAddNewKeySubmit} style={{ marginBottom: '20px', padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <h3>Thêm Private Key</h3>
+                      <div className="form-group">
+                        <label>Nhãn (Tên gợi nhớ)</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. kien-private.pem"
+                          value={keyLabel}
+                          onChange={(e) => setKeyLabel(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          Nội dung Private Key (PEM format)
+                          <button 
+                            type="button" 
+                            className="file-upload-btn-secondary"
+                            onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                            style={{ padding: '2px 6px', fontSize: '10px' }}
+                          >
+                            <Upload size={10} style={{ marginRight: '2px' }} /> Chọn file .pem
+                          </button>
+                        </label>
+                        <textarea 
+                          placeholder="-----BEGIN RSA PRIVATE KEY-----..."
+                          value={keyContent}
+                          onChange={(e) => setKeyContent(e.target.value)}
+                          rows={4}
+                          required
+                          style={{ fontFamily: 'monospace', fontSize: '11px' }}
+                        />
+                        <input 
+                          type="file" 
+                          ref={fileInputRef} 
+                          style={{ display: 'none' }} 
+                          onChange={handleKeyFileChange}
+                          accept=".pem,.key,.txt,*"
+                        />
+                      </div>
+                      <div className="form-actions-row">
+                        <button type="submit" className="save-btn-primary" style={{ padding: '4px 10px', fontSize: '12px' }}>Lưu khóa</button>
+                        <button type="button" className="cancel-btn-secondary" onClick={() => setShowKeyForm(false)} style={{ padding: '4px 10px', fontSize: '12px' }}>Hủy</button>
+                      </div>
+                    </form>
+                  )}
 
-              <div className="keys-list-container">
-                {(!keys || keys.length === 0) ? (
-                  <div className="empty-state">
-                    <Key size={48} className="empty-icon" />
-                    <h3>Không có khóa nào được tạo</h3>
-                    <p>Hãy thêm một private key (.pem) để liên kết với các máy chủ SSH.</p>
+                  <div className="keys-list-container">
+                    {(!keys || keys.length === 0) ? (
+                      <div className="empty-state-small" style={{ padding: '30px', textAlign: 'center', color: 'var(--termius-dark-text-muted)' }}>
+                        <Key size={32} style={{ marginBottom: '8px', opacity: 0.5 }} />
+                        <p style={{ fontSize: '12px' }}>Chưa có khóa private key nào.</p>
+                      </div>
+                    ) : (
+                      <div className="keys-stack" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {keys.map(k => (
+                          <div key={k.id} className="key-card-compact" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: 'var(--termius-dark-card)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div className="key-card-icon-small" style={{ color: 'var(--termius-accent)' }}>
+                                <Key size={16} />
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--termius-dark-text)' }}>{k.label}</div>
+                                <div style={{ fontSize: '11px', color: 'var(--termius-dark-text-muted)' }}>Type RSA ({k.keyContent ? k.keyContent.length : 0} B)</div>
+                              </div>
+                            </div>
+                            <button 
+                              type="button"
+                              className="key-delete-btn" 
+                              onClick={() => {
+                                if (window.confirm(`Bạn có chắc chắn muốn xóa khóa "${k.label}"?`)) {
+                                  onDeleteKey(k.id);
+                                }
+                              }}
+                              style={{ background: 'transparent', border: 'none', color: '#ff4d4f', cursor: 'pointer' }}
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="keys-grid">
-                    {keys.map(k => (
-                      <div key={k.id} className="key-card">
-                        <div className="key-card-icon">
-                          <Key size={20} />
-                        </div>
-                        <div className="key-card-info">
-                          <div className="key-card-label">{k.label}</div>
-                          <div className="key-card-summary">
-                            PEM Private Key ({k.keyContent ? k.keyContent.length : 0} bytes)
+                </div>
+
+                {/* PHẦN 2: IDENTITIES MANAGER */}
+                <div className="keychain-section">
+                  <div className="keychain-header">
+                    <h2>Identities (Tài khoản)</h2>
+                    <button 
+                      className="add-key-btn" 
+                      onClick={() => setShowIdentityForm(!showIdentityForm)}
+                      style={{ padding: '4px 8px', fontSize: '11px' }}
+                    >
+                      {showIdentityForm ? 'Đóng' : 'Thêm Identity'}
+                    </button>
+                  </div>
+
+                  {showIdentityForm && (
+                    <form className="keychain-add-form animate-slide-down" onSubmit={handleAddIdentitySubmit} style={{ marginBottom: '20px', padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <h3>Thêm Định danh mới</h3>
+                      
+                      <div className="form-group">
+                        <label>Nhãn định danh (Tên gợi nhớ)</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. kien'ssh(sen)"
+                          value={identityLabel}
+                          onChange={(e) => setIdentityLabel(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>SSH Username</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. kiennt"
+                          value={identityUsername}
+                          onChange={(e) => setIdentityUsername(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>Phương thức xác thực</label>
+                        <select 
+                          value={identityAuthType}
+                          onChange={(e) => setIdentityAuthType(e.target.value)}
+                          className="key-select-dropdown"
+                        >
+                          <option value="password">Mật khẩu (Password)</option>
+                          <option value="key">Khóa Private Key (Key)</option>
+                        </select>
+                      </div>
+
+                      {identityAuthType === 'password' ? (
+                        <div className="form-group">
+                          <label>Mật khẩu</label>
+                          <div className="password-input-wrapper">
+                            <input 
+                              type={showIdentityPassword ? 'text' : 'password'}
+                              placeholder="Nhập mật khẩu SSH..."
+                              value={identityPassword}
+                              onChange={(e) => setIdentityPassword(e.target.value)}
+                              required
+                            />
+                            <button 
+                              type="button" 
+                              className="password-toggle-btn"
+                              onClick={() => setShowIdentityPassword(!showIdentityPassword)}
+                            >
+                              {showIdentityPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
                           </div>
                         </div>
-                        <button 
-                          className="key-delete-btn" 
-                          onClick={() => {
-                            if (window.confirm(`Bạn có chắc chắn muốn xóa khóa "${k.label}"?`)) {
-                              onDeleteKey(k.id);
-                            }
-                          }}
-                          title="Xóa khóa"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                      ) : (
+                        <div className="form-group">
+                          <label>Chọn khóa liên kết từ Keychain</label>
+                          <select 
+                            value={identityKeyId}
+                            onChange={(e) => setIdentityKeyId(e.target.value)}
+                            className="key-select-dropdown"
+                            required
+                          >
+                            <option value="">-- Chọn Private Key --</option>
+                            {keys.map(k => (
+                              <option key={k.id} value={k.id}>{k.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      <div className="form-actions-row">
+                        <button type="submit" className="save-btn-primary" style={{ padding: '4px 10px', fontSize: '12px' }}>Lưu định danh</button>
+                        <button type="button" className="cancel-btn-secondary" onClick={() => setShowIdentityForm(false)} style={{ padding: '4px 10px', fontSize: '12px' }}>Hủy</button>
                       </div>
-                    ))}
+                    </form>
+                  )}
+
+                  <div className="keys-list-container">
+                    {(!identities || identities.length === 0) ? (
+                      <div className="empty-state-small" style={{ padding: '30px', textAlign: 'center', color: 'var(--termius-dark-text-muted)' }}>
+                        <Laptop size={32} style={{ marginBottom: '8px', opacity: 0.5 }} />
+                        <p style={{ fontSize: '12px' }}>Chưa có định danh (identity) nào.</p>
+                      </div>
+                    ) : (
+                      <div className="keys-stack" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {identities.map(id => {
+                          const linkedKey = keys.find(k => k.id === id.keyId);
+                          return (
+                            <div key={id.id} className="key-card-compact" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: 'var(--termius-dark-card)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div className="key-card-icon-small" style={{ color: 'var(--termius-accent)' }}>
+                                  <Laptop size={16} />
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--termius-dark-text)' }}>{id.label}</div>
+                                  <div style={{ fontSize: '11px', color: 'var(--termius-dark-text-muted)' }}>
+                                    user: {id.username} | auth: {id.authType === 'key' ? `key (${linkedKey ? linkedKey.label : 'Khóa đã bị xóa'})` : 'password'}
+                                  </div>
+                                </div>
+                              </div>
+                              <button 
+                                type="button"
+                                className="key-delete-btn" 
+                                onClick={() => {
+                                  if (window.confirm(`Bạn có chắc chắn muốn xóa định danh "${id.label}"?`)) {
+                                    onDeleteIdentity(id.id);
+                                  }
+                                }}
+                                style={{ background: 'transparent', border: 'none', color: '#ff4d4f', cursor: 'pointer' }}
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
+
               </div>
             </div>
           )}
@@ -678,17 +867,153 @@ export default function HostsDashboard({
       <div className={`dashboard-details-pane ${isPaneOpen ? 'open' : ''}`}>
         {isPaneOpen && (
           <>
-            <div className="pane-header">
-              <h3>{isNewHostMode ? 'New Host Details' : 'Host Details'}</h3>
-              <button className="pane-close-btn" onClick={handleClosePane}>
+            <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ margin: 0 }}>{isNewHostMode ? 'New Host' : 'Host Details'}</h3>
+                
+                {/* Nút bấm nhanh CONNECT & SAVE ở trên đầu để tiện sử dụng */}
+                <button 
+                  type="button" 
+                  className="pane-save-btn-top"
+                  onClick={handleSaveHost}
+                  style={{ padding: '4px 10px', fontSize: '11px', background: 'rgba(255,255,255,0.08)', color: 'var(--text-main)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+                >
+                  Save
+                </button>
+                
+                {!isNewHostMode && (
+                  <button 
+                    type="button" 
+                    className="pane-connect-btn-top"
+                    onClick={handleConnect}
+                    style={{ padding: '4px 10px', fontSize: '11px', background: 'var(--termius-accent)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}
+                  >
+                    <ExternalLink size={10} /> CONNECT
+                  </button>
+                )}
+              </div>
+              
+              <button className="pane-close-btn" onClick={handleClosePane} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
                 <X size={16} />
               </button>
             </div>
 
             <form className="pane-form connection-form-container" onSubmit={handleSaveHost}>
-              {/* Main info */}
-              <div className="pane-section">
-                <div className="form-group">
+              {/* Block 1: Credentials (Xác thực) */}
+              <div className="pane-section" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '16px', marginBottom: '16px' }}>
+                <h4 className="section-title" style={{ marginTop: 0, marginBottom: '12px' }}>1. Credentials (Xác thực)</h4>
+                
+                <div className="form-group animate-fade-in" style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    Credentials Identity (Định danh tập trung)
+                    <span style={{ fontSize: '10px', color: 'var(--termius-accent)', fontWeight: 'bold' }}>Termius Style</span>
+                  </label>
+                  <select 
+                    value={hostIdentityId} 
+                    onChange={(e) => {
+                      setHostIdentityId(e.target.value);
+                      if (e.target.value !== '') {
+                        // Đồng bộ các trường hiển thị read-only
+                        const identity = identities.find(i => i.id === e.target.value);
+                        if (identity) {
+                          setHostUsername(identity.username);
+                          if (identity.authType === 'password') {
+                            setHostPassword(identity.password);
+                            setHostKeyId('');
+                          } else {
+                            setHostKeyId(identity.keyId);
+                            setHostPassword('');
+                          }
+                        }
+                      }
+                    }}
+                    id="select-conn-identity"
+                    className="key-select-dropdown"
+                    style={{ background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', border: '1px solid rgba(255, 255, 255, 0.1)', cursor: 'pointer' }}
+                  >
+                    <option value="">-- Nhập thông tin đăng nhập thủ công --</option>
+                    {identities.map(i => (
+                      <option key={i.id} value={i.id}>{i.label} ({i.username})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '12px' }}>
+                  <label>Username</label>
+                  <input 
+                    type="text" 
+                    placeholder="ubuntu"
+                    value={hostUsername}
+                    onChange={(e) => setHostUsername(e.target.value)}
+                    id="input-conn-username"
+                    disabled={hostIdentityId !== ''}
+                    style={hostIdentityId !== '' ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '12px' }}>
+                  <label>Password (Không bắt buộc)</label>
+                  <div className="password-input-wrapper">
+                    <input 
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder={hostIdentityId !== '' ? "Được quản lý bởi Identity" : "Leave blank for key auth"}
+                      value={hostPassword}
+                      onChange={(e) => setHostPassword(e.target.value)}
+                      id="input-conn-password"
+                      disabled={hostIdentityId !== ''}
+                      style={hostIdentityId !== '' ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                    />
+                    <button 
+                      type="button" 
+                      className="password-toggle-btn"
+                      onClick={() => setShowPassword(!showPassword)}
+                      disabled={hostIdentityId !== ''}
+                    >
+                      {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    Linked Private Key
+                    <button 
+                      type="button" 
+                      className="create-key-fast-btn" 
+                      onClick={handleAddKeyFromPane}
+                      disabled={hostIdentityId !== ''}
+                      style={hostIdentityId !== '' ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                    >
+                      + Add Key
+                    </button>
+                  </label>
+                  <select 
+                    value={hostKeyId} 
+                    onChange={(e) => setHostKeyId(e.target.value)}
+                    id="select-conn-key"
+                    className="key-select-dropdown"
+                    disabled={hostIdentityId !== ''}
+                    style={hostIdentityId !== '' ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                  >
+                    <option value="">-- Sử dụng Mật khẩu hoặc Mặc định --</option>
+                    {keys.map(k => (
+                      <option key={k.id} value={k.id}>{k.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {hostIdentityId !== '' && (
+                  <div style={{ fontSize: '11px', color: 'var(--termius-accent)', marginTop: '8px', padding: '6px 10px', background: 'rgba(0,126,255,0.05)', borderRadius: '4px', border: '1px solid rgba(0,126,255,0.1)' }}>
+                    ℹ️ Thông tin xác thực được quản lý tập trung bởi Identity được chọn.
+                  </div>
+                )}
+              </div>
+
+              {/* Block 2: Host Info (Mạng) */}
+              <div className="pane-section" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '16px', marginBottom: '16px' }}>
+                <h4 className="section-title" style={{ marginTop: 0, marginBottom: '12px' }}>2. Host Connection (Mạng)</h4>
+                
+                <div className="form-group" style={{ marginBottom: '12px' }}>
                   <label>Label (Tên gợi nhớ)</label>
                   <input 
                     type="text" 
@@ -699,7 +1024,7 @@ export default function HostsDashboard({
                     id="input-conn-label"
                   />
                 </div>
-                <div className="form-group">
+                <div className="form-group" style={{ marginBottom: '12px' }}>
                   <label>Host Address (IP/Hostname)</label>
                   <input 
                     type="text" 
@@ -710,7 +1035,7 @@ export default function HostsDashboard({
                     id="input-conn-host"
                   />
                 </div>
-                <div className="form-group">
+                <div className="form-group" style={{ marginBottom: '12px' }}>
                   <label>SSH Port</label>
                   <input 
                     type="text" 
@@ -720,36 +1045,13 @@ export default function HostsDashboard({
                     id="input-conn-port"
                   />
                 </div>
-                <div className="form-group">
-                  <label>Username</label>
-                  <input 
-                    type="text" 
-                    placeholder="ubuntu"
-                    value={hostUsername}
-                    onChange={(e) => setHostUsername(e.target.value)}
-                    id="input-conn-username"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Password (Không bắt buộc)</label>
-                  <div className="password-input-wrapper">
-                    <input 
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="Leave blank for key auth"
-                      value={hostPassword}
-                      onChange={(e) => setHostPassword(e.target.value)}
-                      id="input-conn-password"
-                    />
-                    <button 
-                      type="button" 
-                      className="password-toggle-btn"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </button>
-                  </div>
-                </div>
-                <div className="form-group">
+              </div>
+
+              {/* Block 3: Phân loại */}
+              <div className="pane-section" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '16px', marginBottom: '16px' }}>
+                <h4 className="section-title" style={{ marginTop: 0, marginBottom: '12px' }}>3. Categorization (Phân loại)</h4>
+                
+                <div className="form-group" style={{ marginBottom: '12px' }}>
                   <label>Group Folder</label>
                   {!showCustomGroupInput ? (
                     <select 
@@ -798,6 +1100,7 @@ export default function HostsDashboard({
                     </div>
                   )}
                 </div>
+
                 <div className="form-group">
                   <label>Tags (Phân tách bằng dấu phẩy)</label>
                   <input 
@@ -810,35 +1113,7 @@ export default function HostsDashboard({
                 </div>
               </div>
 
-              {/* Credentials */}
-              <div className="pane-section border-top">
-                <h4 className="section-title">Credentials Identity</h4>
-                <div className="form-group">
-                  <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    Linked Private Key
-                    <button 
-                      type="button" 
-                      className="create-key-fast-btn" 
-                      onClick={handleAddKeyFromPane}
-                    >
-                      + Add Key
-                    </button>
-                  </label>
-                  <select 
-                    value={hostKeyId} 
-                    onChange={(e) => setHostKeyId(e.target.value)}
-                    id="select-conn-key"
-                    className="key-select-dropdown"
-                  >
-                    <option value="">-- Sử dụng Mật khẩu hoặc Mặc định --</option>
-                    {keys.map(k => (
-                      <option key={k.id} value={k.id}>{k.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Advanced Features (Simulated) */}
+              {/* Block 4: Advanced Features (Simulated) */}
               <div className="pane-section border-top">
                 <h4 className="section-title">Advanced Settings</h4>
                 

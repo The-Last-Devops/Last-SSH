@@ -21,13 +21,26 @@ export default function SFTPBrowser({
 }) {
   const [items, setItems] = useState([]);
   const [dragActive, setDragActive] = useState(false);
+  const isDesktop = typeof window !== 'undefined' && window.electronAPI !== undefined;
 
   // Load tệp tin từ SSH session mỗi khi thay đổi path hoặc tabId
-  const loadFiles = useCallback(() => {
+  const loadFiles = useCallback(async () => {
     if (!tabId || !currentPath) return;
-    const fileList = sshSimulator.sftpList(tabId, currentPath);
-    setItems(fileList);
-  }, [tabId, currentPath]);
+    if (isDesktop) {
+      try {
+        const fileList = await window.electronAPI.sftpList(currentPath);
+        setItems(fileList);
+      } catch (err) {
+        console.error("Lỗi sftpList:", err);
+        if (onTerminalLog) {
+          onTerminalLog(`\r\nsftp error: Không thể liệt kê thư mục: ${err.message}`);
+        }
+      }
+    } else {
+      const fileList = sshSimulator.sftpList(tabId, currentPath);
+      setItems(fileList);
+    }
+  }, [tabId, currentPath, isDesktop, onTerminalLog]);
 
   useEffect(() => {
     const initLoad = async () => {
@@ -61,66 +74,132 @@ export default function SFTPBrowser({
   };
 
   // Tạo thư mục mới trực quan
-  const handleMkdir = () => {
+  const handleMkdir = async () => {
     const name = prompt('Nhập tên thư mục mới trên server:');
     if (!name || name.trim() === '') return;
 
-    const success = sshSimulator.sftpMkdir(tabId, currentPath, name.trim());
-    if (success) {
-      loadFiles();
-      if (onTerminalLog) {
-        onTerminalLog(`\r\nsftp: Created remote directory '${name.trim()}' visually.`);
+    if (isDesktop) {
+      try {
+        const success = await window.electronAPI.sftpMkdir(currentPath, name.trim());
+        if (success) {
+          loadFiles();
+          if (onTerminalLog) {
+            onTerminalLog(`\r\nsftp: Created remote directory '${name.trim()}' visually.`);
+          }
+        }
+      } catch (err) {
+        alert('Không thể tạo thư mục: ' + err.message);
       }
     } else {
-      alert('Không thể tạo thư mục (trùng tên hoặc lỗi)');
+      const success = sshSimulator.sftpMkdir(tabId, currentPath, name.trim());
+      if (success) {
+        loadFiles();
+        if (onTerminalLog) {
+          onTerminalLog(`\r\nsftp: Created remote directory '${name.trim()}' visually.`);
+        }
+      } else {
+        alert('Không thể tạo thư mục (trùng tên hoặc lỗi)');
+      }
     }
   };
 
-  // Mô phỏng tải file (Download)
-  const handleDownload = (fileName) => {
-    const content = sshSimulator.sftpDownload(tabId, currentPath, fileName);
-    if (content === null) return;
+  // Tải file (Download)
+  const handleDownload = async (fileName) => {
+    if (isDesktop) {
+      try {
+        const content = await window.electronAPI.sftpDownload(currentPath, fileName);
+        if (content === null) return;
 
-    // Tạo blob tải file thật về máy người dùng
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+        // Tạo blob tải file thật về máy người dùng
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
 
-    if (onTerminalLog) {
-      onTerminalLog(`\r\nsftp: Downloaded remote file '${fileName}' (size: ${content.length} bytes).`);
+        if (onTerminalLog) {
+          onTerminalLog(`\r\nsftp: Downloaded remote file '${fileName}' (size: ${content.length} bytes).`);
+        }
+      } catch (err) {
+        alert('Không thể tải xuống file: ' + err.message);
+      }
+    } else {
+      const content = sshSimulator.sftpDownload(tabId, currentPath, fileName);
+      if (content === null) return;
+
+      // Tạo blob tải file thật về máy người dùng
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      if (onTerminalLog) {
+        onTerminalLog(`\r\nsftp: Downloaded remote file '${fileName}' (size: ${content.length} bytes).`);
+      }
     }
   };
 
-  // Mô phỏng Upload (tạo file nhập tay)
-  const handleUploadClick = () => {
+  // Upload (tạo file nhập tay)
+  const handleUploadClick = async () => {
     const name = prompt('Nhập tên file mới để upload:');
     if (!name || name.trim() === '') return;
     const content = prompt('Nhập nội dung tệp tin:');
     
-    const success = sshSimulator.sftpUpload(tabId, currentPath, name.trim(), content || '');
-    if (success) {
-      loadFiles();
-      if (onTerminalLog) {
-        onTerminalLog(`\r\nsftp: Uploaded file '${name.trim()}' visually.`);
+    if (isDesktop) {
+      try {
+        const success = await window.electronAPI.sftpUpload(currentPath, name.trim(), content || '');
+        if (success) {
+          loadFiles();
+          if (onTerminalLog) {
+            onTerminalLog(`\r\nsftp: Uploaded file '${name.trim()}' visually.`);
+          }
+        }
+      } catch (err) {
+        alert('Không thể upload file: ' + err.message);
+      }
+    } else {
+      const success = sshSimulator.sftpUpload(tabId, currentPath, name.trim(), content || '');
+      if (success) {
+        loadFiles();
+        if (onTerminalLog) {
+          onTerminalLog(`\r\nsftp: Uploaded file '${name.trim()}' visually.`);
+        }
       }
     }
   };
 
   // Xóa file/folder visual
-  const handleDelete = (e, name) => {
+  const handleDelete = async (e, name) => {
     e.stopPropagation();
     if (confirm(`Bạn chắc chắn muốn xóa mục '${name}' trên remote server?`)) {
-      const success = sshSimulator.sftpRm(tabId, currentPath, name);
-      if (success) {
-        loadFiles();
-        if (onTerminalLog) {
-          onTerminalLog(`\r\nsftp: Removed remote item '${name}' visually.`);
+      if (isDesktop) {
+        try {
+          const success = await window.electronAPI.sftpRm(currentPath, name);
+          if (success) {
+            loadFiles();
+            if (onTerminalLog) {
+              onTerminalLog(`\r\nsftp: Removed remote item '${name}' visually.`);
+            }
+          }
+        } catch (err) {
+          alert('Không thể xóa mục: ' + err.message);
+        }
+      } else {
+        const success = sshSimulator.sftpRm(tabId, currentPath, name);
+        if (success) {
+          loadFiles();
+          if (onTerminalLog) {
+            onTerminalLog(`\r\nsftp: Removed remote item '${name}' visually.`);
+          }
         }
       }
     }
@@ -150,12 +229,22 @@ export default function SFTPBrowser({
       for (const file of files) {
         try {
           const content = await readFileContent(file);
-          sshSimulator.sftpUpload(tabId, currentPath, file.name, content);
-          if (onTerminalLog) {
-            onTerminalLog(`\r\nsftp: Dropped & Uploaded file '${file.name}' (${file.size} bytes) from your device successfully!`);
+          if (isDesktop) {
+            await window.electronAPI.sftpUpload(currentPath, file.name, content);
+            if (onTerminalLog) {
+              onTerminalLog(`\r\nsftp: Dropped & Uploaded file '${file.name}' (${file.size} bytes) from your device successfully!`);
+            }
+          } else {
+            sshSimulator.sftpUpload(tabId, currentPath, file.name, content);
+            if (onTerminalLog) {
+              onTerminalLog(`\r\nsftp: Dropped & Uploaded file '${file.name}' (${file.size} bytes) from your device successfully!`);
+            }
           }
         } catch (err) {
-          console.error('Không thể đọc file:', err);
+          console.error('Không thể đọc hoặc upload file:', err);
+          if (onTerminalLog) {
+            onTerminalLog(`\r\nsftp error: Lỗi tải lên file thả vào: ${err.message}`);
+          }
         }
       }
       loadFiles();

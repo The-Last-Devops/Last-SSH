@@ -26,7 +26,8 @@ const DEFAULT_SETTINGS = {
 const STORAGE_KEYS = {
   SETTINGS: 'terminus_settings',
   CONNECTIONS_PLAIN: 'terminus_connections_plain',
-  KEYS_PLAIN: 'terminus_keys_plain'
+  KEYS_PLAIN: 'terminus_keys_plain',
+  IDENTITIES_PLAIN: 'terminus_identities_plain'
 };
 
 const generateUniqueId = (prefix) => {
@@ -41,6 +42,7 @@ export default function App() {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [connections, setConnections] = useState([]);
   const [keys, setKeys] = useState([]);
+  const [identities, setIdentities] = useState([]);
 
   // 3. Quản lý Đa Tab (Tab Management)
   const [tabs, setTabs] = useState([]);
@@ -120,13 +122,40 @@ export default function App() {
   // TÁC VỤ KẾT NỐI SSH & ĐỒNG BỘ SFTP (SSH & SFTP INTERACTION)
   // -------------------------------------------------------------
   const handleConnectSSH = (profile) => {
+    // 1. Phân giải Identity credentials
+    let resolvedProfile = { ...profile };
+    if (profile.identityId) {
+      const identity = (identities || []).find(i => i.id === profile.identityId);
+      if (identity) {
+        resolvedProfile.username = identity.username;
+        if (identity.authType === 'password') {
+          resolvedProfile.password = identity.password;
+          resolvedProfile.keyId = '';
+        } else if (identity.authType === 'key') {
+          resolvedProfile.keyId = identity.keyId;
+          resolvedProfile.password = '';
+        }
+      }
+    }
+
+    // 2. Phân giải Private Key content
+    if (resolvedProfile.keyId) {
+      const matchedKey = (keys || []).find(k => k.id === resolvedProfile.keyId);
+      if (matchedKey) {
+        resolvedProfile.keyContent = matchedKey.keyContent;
+        if (matchedKey.passphrase) {
+          resolvedProfile.passphrase = matchedKey.passphrase;
+        }
+      }
+    }
+
     const tabId = generateUniqueId('tab-ssh');
     
     // Tạo phiên SSH mô phỏng
-    const session = sshSimulator.createSession(tabId, profile, keys);
+    const session = sshSimulator.createSession(tabId, resolvedProfile, keys);
 
     const initialHistory = [
-      { type: 'system', text: `\r\nStarting SSH connection to ${profile.label}...` }
+      { type: 'system', text: `\r\nStarting SSH connection to ${resolvedProfile.label}...` }
     ];
     session.logs.forEach(log => {
       initialHistory.push({ type: 'output', text: log });
@@ -134,12 +163,12 @@ export default function App() {
 
     const newTab = {
       id: tabId,
-      title: `ssh: ${profile.host}`,
+      title: `ssh: ${resolvedProfile.host}`,
       type: 'ssh',
-      currentPath: `/home/${profile.username}`,
+      currentPath: `/home/${resolvedProfile.username}`,
       history: initialHistory,
       commandHistory: [],
-      connectionProfile: profile
+      connectionProfile: resolvedProfile
     };
 
     setTabs(prev => [...prev, newTab]);
@@ -186,7 +215,8 @@ export default function App() {
       securityService.saveSecureData({
         connections: connections,
         settings: updated,
-        keys: keys
+        keys: keys,
+        identities: identities
       }).catch(e => console.error('Lỗi đồng bộ mã hóa settings:', e));
     }
   };
@@ -224,7 +254,8 @@ export default function App() {
           await securityService.saveSecureData({
             connections: connectionsList,
             settings: settings,
-            keys: keys
+            keys: keys,
+            identities: identities
           });
         } catch (e) {
           console.error('Không thể đồng bộ mã hóa connections:', e);
@@ -275,7 +306,8 @@ export default function App() {
           await securityService.saveSecureData({
             connections: connections,
             settings: settings,
-            keys: keysList
+            keys: keysList,
+            identities: identities
           });
         } catch (e) {
           console.error('Không thể đồng bộ mã hóa keys:', e);
@@ -283,6 +315,59 @@ export default function App() {
       }
     } else {
       localStorage.setItem(STORAGE_KEYS.KEYS_PLAIN, JSON.stringify(keysList));
+    }
+  };
+
+  // -------------------------------------------------------------
+  // TÁC VỤ QUẢN LÝ SSH IDENTITIES (SSH IDENTITIES WORKFLOW)
+  // -------------------------------------------------------------
+  const handleAddIdentity = async (newIdentity) => {
+    const identityProfile = { ...newIdentity, id: generateUniqueId('identity') };
+    const currentIdentities = Array.isArray(identities) ? identities : [];
+    const updated = [...currentIdentities, identityProfile];
+    setIdentities(updated);
+    await saveIdentitiesState(updated);
+  };
+
+  // eslint-disable-next-line no-unused-vars
+  const handleEditIdentity = async (id, updatedIdentity) => {
+    const currentIdentities = Array.isArray(identities) ? identities : [];
+    const updated = currentIdentities.map(i => i.id === id ? { ...i, ...updatedIdentity } : i);
+    setIdentities(updated);
+    await saveIdentitiesState(updated);
+  };
+
+  const handleDeleteIdentity = async (id) => {
+    // Xóa liên kết identity ở các connection profile
+    const currentConns = Array.isArray(connections) ? connections : [];
+    const updatedConns = currentConns.map(c => c.identityId === id ? { ...c, identityId: '' } : c);
+    if (JSON.stringify(updatedConns) !== JSON.stringify(connections)) {
+      setConnections(updatedConns);
+      await saveConnectionsState(updatedConns);
+    }
+
+    const currentIdentities = Array.isArray(identities) ? identities : [];
+    const updated = currentIdentities.filter(i => i.id !== id);
+    setIdentities(updated);
+    await saveIdentitiesState(updated);
+  };
+
+  const saveIdentitiesState = async (identitiesList) => {
+    if (securityService.hasPIN()) {
+      if (securityService.isUnlocked) {
+        try {
+          await securityService.saveSecureData({
+            connections: connections,
+            settings: settings,
+            keys: keys,
+            identities: identitiesList
+          });
+        } catch (e) {
+          console.error('Không thể đồng bộ mã hóa identities:', e);
+        }
+      }
+    } else {
+      localStorage.setItem(STORAGE_KEYS.IDENTITIES_PLAIN, JSON.stringify(identitiesList));
     }
   };
 
@@ -303,6 +388,9 @@ export default function App() {
     }
     if (decryptedPayload.keys) {
       setKeys(Array.isArray(decryptedPayload.keys) ? decryptedPayload.keys : []);
+    }
+    if (decryptedPayload.identities) {
+      setIdentities(Array.isArray(decryptedPayload.identities) ? decryptedPayload.identities : []);
     }
   };
 
@@ -329,13 +417,22 @@ export default function App() {
         localStorage.setItem(STORAGE_KEYS.KEYS_PLAIN, JSON.stringify(keysList));
       }
     }
+    // 5. Cập nhật Identities
+    if (importedData.identities) {
+      const identitiesList = Array.isArray(importedData.identities) ? importedData.identities : [];
+      setIdentities(identitiesList);
+      if (!securityService.hasPIN()) {
+        localStorage.setItem(STORAGE_KEYS.IDENTITIES_PLAIN, JSON.stringify(identitiesList));
+      }
+    }
 
     // Nếu đã kích hoạt PIN, mã hóa ghi đè toàn bộ dữ liệu mới nhận
     if (securityService.hasPIN() && securityService.isUnlocked) {
       securityService.saveSecureData({
         connections: importedData.connections || connections,
         settings: importedData.settings || settings,
-        keys: importedData.keys || keys
+        keys: importedData.keys || keys,
+        identities: importedData.identities || identities
       }).catch(e => console.error('Lỗi mã hóa dữ liệu import:', e));
     }
 
@@ -358,6 +455,7 @@ export default function App() {
     localStorage.removeItem(STORAGE_KEYS.SETTINGS);
     localStorage.removeItem(STORAGE_KEYS.CONNECTIONS_PLAIN);
     localStorage.removeItem(STORAGE_KEYS.KEYS_PLAIN);
+    localStorage.removeItem(STORAGE_KEYS.IDENTITIES_PLAIN);
     // 3. Reset security
     securityService.resetSecurity();
 
@@ -365,6 +463,7 @@ export default function App() {
     setSettings(DEFAULT_SETTINGS);
     setConnections([]);
     setKeys([]);
+    setIdentities([]);
     setIsLocked(false);
     setIsSftpOpenMap({});
     
@@ -438,6 +537,18 @@ export default function App() {
           } catch (e) {
             console.error('Lỗi đọc keys plain:', e);
             setKeys([]);
+          }
+        }
+
+        // Tải Identities plain
+        const storedIdentities = localStorage.getItem(STORAGE_KEYS.IDENTITIES_PLAIN);
+        if (storedIdentities) {
+          try {
+            const parsed = JSON.parse(storedIdentities);
+            setIdentities(Array.isArray(parsed) ? parsed : []);
+          } catch (e) {
+            console.error('Lỗi đọc identities plain:', e);
+            setIdentities([]);
           }
         }
       }
@@ -529,12 +640,15 @@ export default function App() {
                 <HostsDashboard 
                   connections={connections}
                   keys={keys}
+                  identities={identities}
                   onAddConnection={handleAddConnection}
                   onEditConnection={handleEditConnection}
                   onDeleteConnection={handleDeleteConnection}
                   onConnectSSH={handleConnectSSH}
                   onAddKey={handleAddKey}
                   onDeleteKey={handleDeleteKey}
+                  onAddIdentity={handleAddIdentity}
+                  onDeleteIdentity={handleDeleteIdentity}
                 />
               ) : (
                 activeTab && (
