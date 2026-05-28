@@ -19,35 +19,75 @@ export default function SFTPBrowser({
   onNavigate,
   onTerminalLog // Callback để in log ra terminal khi người dùng thực hiện thao tác visual
 }) {
+  const isDesktop = typeof window !== 'undefined' && window.electronAPI !== undefined;
   const [items, setItems] = useState([]);
   const [dragActive, setDragActive] = useState(false);
-  const isDesktop = typeof window !== 'undefined' && window.electronAPI !== undefined;
+  const [isSftpReady, setIsSftpReady] = useState(!isDesktop); // Trên browser: luôn ready; Desktop: chờ signal
+  const [sftpError, setSftpError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Load tệp tin từ SSH session mỗi khi thay đổi path hoặc tabId
   const loadFiles = useCallback(async () => {
     if (!tabId || !currentPath) return;
+    if (!isSftpReady) return; // Chưa sẵn sàng, không gọi
+
+    setIsLoading(true);
     if (isDesktop) {
       try {
         const fileList = await window.electronAPI.sftpList(currentPath);
         setItems(fileList);
+        setSftpError(null);
       } catch (err) {
         console.error("Lỗi sftpList:", err);
+        setSftpError(err.message);
         if (onTerminalLog) {
           onTerminalLog(`\r\nsftp error: Không thể liệt kê thư mục: ${err.message}`);
         }
+      } finally {
+        setIsLoading(false);
       }
     } else {
       const fileList = sshSimulator.sftpList(tabId, currentPath);
       setItems(fileList);
+      setIsLoading(false);
     }
-  }, [tabId, currentPath, isDesktop, onTerminalLog]);
+  }, [tabId, currentPath, isDesktop, onTerminalLog, isSftpReady]);
 
+  // Lắng nghe sự kiện sftp-ready từ Electron (chỉ khi chạy Desktop)
+  // Khi tabId thay đổi, unsubscribe listener cũ và đăng ký listener mới
   useEffect(() => {
-    const initLoad = async () => {
-      loadFiles();
+    if (!isDesktop) {
+      // Không phải Desktop - browser mode luôn sẵn sàng, load ngay
+      const run = async () => { await loadFiles(); };
+      run();
+      return;
+    }
+
+    // Subscribe listener sftp-ready
+    const removeSftpReadyListener = window.electronAPI.onSFTPReady((result) => {
+      if (result && result.success) {
+        setIsSftpReady(true);
+        setSftpError(null);
+      } else {
+        setSftpError(result?.error || 'Server không hỗ trợ SFTP subsystem');
+        setIsSftpReady(false);
+      }
+    });
+
+    return () => {
+      removeSftpReadyListener();
     };
-    initLoad();
-  }, [loadFiles]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabId, isDesktop]);
+
+  // Load files mỗi khi isSftpReady chuyển sang true hoặc currentPath thay đổi
+  useEffect(() => {
+    if (!isSftpReady) return;
+    const run = async () => { await loadFiles(); };
+    run();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSftpReady, currentPath, tabId]);
+
 
   // Click vào mục (thư mục thì cd, file thì download)
   const handleItemClick = (item) => {
@@ -321,35 +361,63 @@ export default function SFTPBrowser({
 
       {/* Visual File Area */}
       <div className="sftp-file-area">
-        {items.length === 0 ? (
+        {/* Trạng thái: Đang chờ SFTP kết nối */}
+        {isDesktop && !isSftpReady && !sftpError && (
           <div style={{ color: 'var(--text-muted)', fontSize: '11px', padding: '24px', textAlign: 'center' }}>
-            Empty directory
+            <div style={{ marginBottom: '8px', opacity: 0.6 }}>⏳</div>
+            Đang chờ SFTP session sẵn sàng...
           </div>
-        ) : (
-          items.map(item => (
-            <div 
-              key={item.name} 
-              className="sftp-item-row"
-              onClick={() => handleItemClick(item)}
-            >
-              <div className="sftp-item-left">
-                {getItemIcon(item)}
-                <span className="sftp-item-name">{item.name}</span>
-              </div>
-              <div className="sftp-item-right">
-                {item.type === 'file' && (
-                  <span className="sftp-item-size">{item.size} B</span>
-                )}
-                <button 
-                  className="sftp-delete-btn"
-                  onClick={(e) => handleDelete(e, item.name)}
-                  title={`Delete remote ${item.type}`}
-                >
-                  <Trash2 size={12} />
-                </button>
-              </div>
+        )}
+
+        {/* Trạng thái: Lỗi SFTP */}
+        {sftpError && (
+          <div style={{ color: '#ff6b6b', fontSize: '11px', padding: '16px', textAlign: 'center', background: 'rgba(255,107,107,0.05)', margin: '8px', borderRadius: '6px', border: '1px solid rgba(255,107,107,0.15)' }}>
+            <div style={{ marginBottom: '4px', fontSize: '14px' }}>⚠️</div>
+            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>SFTP không khả dụng</div>
+            <div style={{ opacity: 0.8, fontSize: '10px' }}>{sftpError}</div>
+          </div>
+        )}
+
+        {/* Trạng thái: Đang tải */}
+        {isLoading && (
+          <div style={{ color: 'var(--text-muted)', fontSize: '11px', padding: '24px', textAlign: 'center' }}>
+            <div style={{ marginBottom: '8px', opacity: 0.6 }}>🔄</div>
+            Đang tải danh sách tệp tin...
+          </div>
+        )}
+
+        {/* Danh sách tệp tin */}
+        {!isLoading && isSftpReady && !sftpError && (
+          items.length === 0 ? (
+            <div style={{ color: 'var(--text-muted)', fontSize: '11px', padding: '24px', textAlign: 'center' }}>
+              Empty directory
             </div>
-          ))
+          ) : (
+            items.map(item => (
+              <div 
+                key={item.name} 
+                className="sftp-item-row"
+                onClick={() => handleItemClick(item)}
+              >
+                <div className="sftp-item-left">
+                  {getItemIcon(item)}
+                  <span className="sftp-item-name">{item.name}</span>
+                </div>
+                <div className="sftp-item-right">
+                  {item.type === 'file' && (
+                    <span className="sftp-item-size">{item.size} B</span>
+                  )}
+                  <button 
+                    className="sftp-delete-btn"
+                    onClick={(e) => handleDelete(e, item.name)}
+                    title={`Delete remote ${item.type}`}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              </div>
+            ))
+          )
         )}
       </div>
 

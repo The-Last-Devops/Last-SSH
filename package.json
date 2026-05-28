@@ -5,8 +5,8 @@
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
-    "dev": "vite",
-    "dev:desktop": "concurrently \"vite\" \"electron .\"",
+    "dev": "vite --port 5173 --strictPort",
+    "dev:desktop": "concurrently \"vite --port 5173 --strictPort\" \"electron .\"",
     "build": "vite build",
     "build:mac": "electron-builder --mac --arm64",
     "lint": "eslint .",

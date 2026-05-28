@@ -67,30 +67,76 @@ export default function TerminalTab({
   // --------------------------------------------------------------------------
   const xtermRef = useRef(null);
   const terminalInstanceRef = useRef(null);
+  const connectionActiveRef = useRef(false); // Guard chống double-connect
 
   useEffect(() => {
     // Chỉ kích hoạt SSH thật nếu chạy trong Electron Desktop App và tab là SSH
     if (!isDesktop || !xtermRef.current || tab.type !== 'ssh') return;
+    // Guard: tránh double-connect do React StrictMode hoặc re-render
+    if (connectionActiveRef.current) return;
+    connectionActiveRef.current = true;
 
     // Khởi tạo Xterm.js
     const term = new Terminal({
       cursorBlink: true,
-      fontFamily: settings.fontFamily || 'Fira Code',
+      fontFamily: '"Courier New", Courier, monospace', // Font an toàn, luôn render được
       fontSize: settings.fontSize || 14,
+      fontWeight: 'normal',
+      lineHeight: 1.3,
+      letterSpacing: 0,
       cursorStyle: settings.cursorStyle || 'block',
       theme: {
-        background: '#1a1e29', // Termius Dark theme màu nền
-        foreground: '#e1e6eb',
-        cursor: '#007eff',
-        selectionBackground: 'rgba(0, 126, 255, 0.3)'
+        background: '#0d1117',
+        foreground: '#c9d1d9',
+        cursor: '#58a6ff',
+        cursorAccent: '#0d1117',
+        selectionBackground: 'rgba(88, 166, 255, 0.3)',
+        black: '#484f58',
+        red: '#ff7b72',
+        green: '#3fb950',
+        yellow: '#d29922',
+        blue: '#58a6ff',
+        magenta: '#bc8cff',
+        cyan: '#39c5cf',
+        white: '#b1bac4',
+        brightBlack: '#6e7681',
+        brightRed: '#ffa198',
+        brightGreen: '#56d364',
+        brightYellow: '#e3b341',
+        brightBlue: '#79c0ff',
+        brightMagenta: '#d2a8ff',
+        brightCyan: '#56d4dd',
+        brightWhite: '#f0f6fc'
       }
     });
 
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     term.open(xtermRef.current);
-    fitAddon.fit();
     terminalInstanceRef.current = term;
+
+    // Delay fit để đợi DOM render xong kích thước thật
+    const fitSafely = () => {
+      try {
+        if (xtermRef.current && xtermRef.current.offsetWidth > 0) {
+          fitAddon.fit();
+          // Sau khi fit, notify server về kích thước thật để top/vim hiển đúng
+          const { cols, rows } = term;
+          if (cols > 0 && rows > 0) {
+            window.electronAPI.resizeSSH({ cols, rows });
+          }
+        }
+      } catch {
+        // ignore - có thể xảy ra khi component unmount giữa chừng
+      }
+    };
+
+    // Gọi fit sau 2 animation frames để đảm bảo layout đã hoàn tất
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        fitSafely();
+      });
+    });
 
     // Đăng ký luồng nhận dữ liệu từ Electron truyền lên
     const removeSSHListener = window.electronAPI.onSSHData((data) => {
@@ -113,13 +159,7 @@ export default function TerminalTab({
 
     // Xử lý co giãn terminal khi thay đổi kích thước cửa sổ
     const handleResize = () => {
-      if (fitAddon) {
-        try {
-          fitAddon.fit();
-        } catch (e) {
-          console.error("Lỗi resize terminal:", e);
-        }
-      }
+      fitSafely();
     };
     window.addEventListener('resize', handleResize);
 
@@ -127,6 +167,7 @@ export default function TerminalTab({
     term.focus();
 
     return () => {
+      connectionActiveRef.current = false; // Reset guard khi unmount
       window.removeEventListener('resize', handleResize);
       onDataDisposable.dispose();
       removeSSHListener();
@@ -370,9 +411,9 @@ export default function TerminalTab({
         style={{
           width: '100%',
           height: '100%',
-          padding: '10px',
-          background: '#1a1e29',
-          overflow: 'hidden'
+          background: '#0d1117',
+          overflow: 'hidden',
+          boxSizing: 'border-box'
         }}
       />
     );

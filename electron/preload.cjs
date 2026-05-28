@@ -9,10 +9,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('ssh-data', subscription);
   },
   writeSSHData: (data) => ipcRenderer.send('ssh-write', data),
+  resizeSSH: (size) => ipcRenderer.send('ssh-resize', size),
   onSSHClose: (callback) => {
     const subscription = () => callback();
     ipcRenderer.on('ssh-close', subscription);
     return () => ipcRenderer.removeListener('ssh-close', subscription);
+  },
+
+  // Thông báo SFTP đã sẵn sàng
+  onSFTPReady: (callback) => {
+    const subscription = (event, result) => callback(result);
+    ipcRenderer.on('sftp-ready', subscription);
+    return () => ipcRenderer.removeListener('sftp-ready', subscription);
   },
 
   // Lệnh SFTP

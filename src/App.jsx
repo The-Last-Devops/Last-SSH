@@ -6,7 +6,7 @@ import SettingsModal from './components/SettingsModal.jsx';
 import LockScreen from './components/LockScreen.jsx';
 import P2PSyncModal from './components/P2PSyncModal.jsx';
 import HostsDashboard from './components/HostsDashboard.jsx';
-import { Settings, FolderSync } from 'lucide-react';
+import { Settings, FolderSync, HardDrive } from 'lucide-react';
 
 import { securityService } from './services/securityService.js';
 import { virtualFS } from './services/virtualFS.js';
@@ -179,8 +179,8 @@ export default function App() {
     setTabs(prev => [...prev, newTab]);
     setActiveTabId(tabId);
     
-    // Mặc định mở visual SFTP cho phiên SSH mới
-    setIsSftpOpenMap(prev => ({ ...prev, [tabId]: true }));
+    // Chỉ mở SFTP nếu host có cấu hình openWithSFTP = true
+    setIsSftpOpenMap(prev => ({ ...prev, [tabId]: !!resolvedProfile.openWithSFTP }));
   };
 
   const handleSwitchToSFTP = (tabId, isOpen) => {
@@ -618,6 +618,26 @@ export default function App() {
                 onNewTab={openNewLocalTab}
               />
               <div className="header-actions" style={{ display: 'flex', gap: '8px', paddingRight: '12px' }}>
+                {/* Nút toggle SFTP - chỉ hiện khi đang ở tab SSH */}
+                {activeTab && activeTab.type === 'ssh' && (
+                  <button 
+                    id="btn-toggle-sftp"
+                    className="toolbar-icon-btn" 
+                    onClick={() => setIsSftpOpenMap(prev => ({ ...prev, [activeTabId]: !prev[activeTabId] }))}
+                    title={isSftpOpen ? 'Ẩn SFTP Explorer' : 'Mở SFTP Explorer'}
+                    style={{ 
+                      background: isSftpOpen ? 'rgba(0,126,255,0.15)' : 'transparent', 
+                      border: isSftpOpen ? '1px solid rgba(0,126,255,0.3)' : '1px solid transparent', 
+                      color: isSftpOpen ? 'var(--termius-accent)' : 'var(--text-muted)', 
+                      cursor: 'pointer', 
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                      width: '32px', height: '32px', borderRadius: '6px',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <HardDrive size={16} />
+                  </button>
+                )}
                 <button 
                   id="btn-p2p"
                   className="toolbar-icon-btn" 

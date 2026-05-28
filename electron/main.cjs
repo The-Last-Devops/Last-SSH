@@ -29,7 +29,7 @@ function createWindow() {
   const isDev = !app.isPackaged;
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools();
+    // mainWindow.webContents.openDevTools(); // Tắt tự động mở console
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
@@ -149,8 +149,8 @@ ipcMain.on('ssh-connect', (event, profile) => {
   client.on('ready', () => {
     event.reply('ssh-data', `\x1b[1;32m[Electron SSH] Xác thực thành công! Đang thiết lập terminal shell...\x1b[0m\r\n`);
 
-    // Mở shell tương tác
-    client.shell({ term: 'xterm-256color', rows: 40, cols: 220 }, (err, stream) => {
+    // Mở shell tương tác (dùng kích thước nhỏ mặc định, renderer sẽ gửi resize thật ngay sau)
+    client.shell({ term: 'xterm-256color', rows: 24, cols: 80 }, (err, stream) => {
       if (err) {
         event.reply('ssh-data', `\r\n\x1b[1;31m[Electron SSH Error] Không thể mở shell: ${err.message}\x1b[0m\r\n`);
         cleanupSession(tabId);
@@ -186,12 +186,20 @@ ipcMain.on('ssh-connect', (event, profile) => {
     client.sftp((err, sftp) => {
       if (err) {
         console.error("Không thể mở phiên SFTP thực:", err.message);
+        // Vẫn thông báo sftp-ready với trạng thái false để SFTPBrowser không bị treo
+        if (mainWindow) {
+          mainWindow.webContents.send('sftp-ready', { success: false, error: err.message });
+        }
         return;
       }
       if (sshSessions[tabId]) {
         sshSessions[tabId].sftp = sftp;
       }
       activeSFTP = sftp;
+      // Thông báo cho renderer biết SFTP đã sẵn sàng
+      if (mainWindow) {
+        mainWindow.webContents.send('sftp-ready', { success: true });
+      }
     });
   });
 
@@ -239,18 +247,44 @@ ipcMain.on('ssh-disconnect', (event, tabId) => {
   cleanupSession(tabId || 'default');
 });
 
+// Thay đổi kích thước terminal (cols x rows) - cần thiết để top/vim hiển thị đúng
+ipcMain.on('ssh-resize', (event, { cols, rows }) => {
+  if (activeShellStream && cols > 0 && rows > 0) {
+    try {
+      activeShellStream.setWindow(rows, cols, 0, 0);
+    } catch (_e) {
+      // Ignore resize errors
+    }
+  }
+});
+
 // --------------------------------------------------------------------------
 // IPC SFTP FILE OPERATIONS CHANNELS (Thao tác tệp SFTP thật 100%)
 // --------------------------------------------------------------------------
 
+// Helper: Lấy SFTP session đang hoạt động (ưu tiên session mới nhất)
+function getActiveSFTP() {
+  // Thử lấy từ sshSessions trước
+  const sessionIds = Object.keys(sshSessions);
+  for (let i = sessionIds.length - 1; i >= 0; i--) {
+    const session = sshSessions[sessionIds[i]];
+    if (session && session.sftp) {
+      return session.sftp;
+    }
+  }
+  // Fallback về activeSFTP global
+  return activeSFTP;
+}
+
 // 1. Duyệt tệp SFTP
 ipcMain.handle('sftp-list', async (event, remotePath) => {
   return new Promise((resolve, reject) => {
-    if (!activeSFTP) {
+    const sftp = getActiveSFTP();
+    if (!sftp) {
       return reject(new Error("SFTP session is not active"));
     }
 
-    activeSFTP.readdir(remotePath, (err, list) => {
+    sftp.readdir(remotePath, (err, list) => {
       if (err) {
         return reject(err);
       }
@@ -274,10 +308,11 @@ ipcMain.handle('sftp-list', async (event, remotePath) => {
 // 2. Tạo thư mục mới
 ipcMain.handle('sftp-mkdir', async (event, remotePath, folderName) => {
   return new Promise((resolve, reject) => {
-    if (!activeSFTP) return reject(new Error("SFTP session is not active"));
+    const sftp = getActiveSFTP();
+    if (!sftp) return reject(new Error("SFTP session is not active"));
     const fullPath = path.posix.join(remotePath, folderName);
 
-    activeSFTP.mkdir(fullPath, (err) => {
+    sftp.mkdir(fullPath, (err) => {
       if (err) return reject(err);
       resolve(true);
     });
@@ -287,10 +322,11 @@ ipcMain.handle('sftp-mkdir', async (event, remotePath, folderName) => {
 // 3. Tạo/Ghi file mới (Tải lên file)
 ipcMain.handle('sftp-upload', async (event, remotePath, fileName, content) => {
   return new Promise((resolve, reject) => {
-    if (!activeSFTP) return reject(new Error("SFTP session is not active"));
+    const sftp = getActiveSFTP();
+    if (!sftp) return reject(new Error("SFTP session is not active"));
     const fullPath = path.posix.join(remotePath, fileName);
 
-    activeSFTP.writeFile(fullPath, content, 'utf8', (err) => {
+    sftp.writeFile(fullPath, content, 'utf8', (err) => {
       if (err) return reject(err);
       resolve(true);
     });
@@ -300,10 +336,11 @@ ipcMain.handle('sftp-upload', async (event, remotePath, fileName, content) => {
 // 4. Đọc file (Tải xuống file)
 ipcMain.handle('sftp-download', async (event, remotePath, fileName) => {
   return new Promise((resolve, reject) => {
-    if (!activeSFTP) return reject(new Error("SFTP session is not active"));
+    const sftp = getActiveSFTP();
+    if (!sftp) return reject(new Error("SFTP session is not active"));
     const fullPath = path.posix.join(remotePath, fileName);
 
-    activeSFTP.readFile(fullPath, 'utf8', (err, data) => {
+    sftp.readFile(fullPath, 'utf8', (err, data) => {
       if (err) return reject(err);
       resolve(data);
     });
@@ -313,15 +350,16 @@ ipcMain.handle('sftp-download', async (event, remotePath, fileName) => {
 // 5. Xóa file hoặc thư mục
 ipcMain.handle('sftp-rm', async (event, remotePath, name) => {
   return new Promise((resolve, reject) => {
-    if (!activeSFTP) return reject(new Error("SFTP session is not active"));
+    const sftp = getActiveSFTP();
+    if (!sftp) return reject(new Error("SFTP session is not active"));
     const fullPath = path.posix.join(remotePath, name);
 
     // Thử xóa file, nếu thất bại thử xóa thư mục
-    activeSFTP.unlink(fullPath, (err) => {
+    sftp.unlink(fullPath, (err) => {
       if (!err) return resolve(true);
 
       // Thất bại -> Thử xóa thư mục
-      activeSFTP.rmdir(fullPath, (errDir) => {
+      sftp.rmdir(fullPath, (errDir) => {
         if (errDir) return reject(errDir);
         resolve(true);
       });

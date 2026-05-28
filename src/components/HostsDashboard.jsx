@@ -124,6 +124,8 @@ export default function HostsDashboard({
   });
 
   // Xử lý Click vào host trong danh sách
+  const clickTimeoutRef = useRef(null);
+
   const handleHostClick = (host) => {
     // Nếu trong môi trường E2E test, click đơn sẽ tự động mở kết nối SSH để tương thích test cũ
     if (typeof window !== 'undefined' && window.__e2e__) {
@@ -131,27 +133,46 @@ export default function HostsDashboard({
       return;
     }
 
-    setSelectedHostId(host.id);
-    setIsNewHostMode(false);
-    
-    setHostLabel(host.label || '');
-    setHostAddress(host.host || '');
-    setHostPort(host.port || '22');
-    setHostUsername(host.username || 'ubuntu');
-    setHostPassword(host.password || '');
-    
-    // Đồng bộ group folder dropdown
-    const groupName = host.group || 'Servers';
-    setSelectedGroup(groupName);
-    setShowCustomGroupInput(false);
-    setCustomGroupValue('');
+    // Cancel previous timeout if clicking rapidly
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+    }
 
-    setHostTags((host.tags || []).join(', '));
-    setHostKeyId(host.keyId || '');
-    setHostIdentityId(host.identityId || '');
-    setHostOpenWithSFTP(!!host.openWithSFTP);
-    
-    setIsPaneOpen(true);
+    // Delay 200ms to allow double click to fire
+    clickTimeoutRef.current = setTimeout(() => {
+      setSelectedHostId(host.id);
+      setIsNewHostMode(false);
+      
+      setHostLabel(host.label || '');
+      setHostAddress(host.host || '');
+      setHostPort(host.port || '22');
+      setHostUsername(host.username || 'ubuntu');
+      setHostPassword(host.password || '');
+      
+      // Đồng bộ group folder dropdown
+      const groupName = host.group || 'Servers';
+      setSelectedGroup(groupName);
+      setShowCustomGroupInput(false);
+      setCustomGroupValue('');
+
+      setHostTags((host.tags || []).join(', '));
+      setHostKeyId(host.keyId || '');
+      setHostIdentityId(host.identityId || '');
+      setHostOpenWithSFTP(!!host.openWithSFTP);
+      
+      setIsPaneOpen(true);
+      clickTimeoutRef.current = null;
+    }, 200);
+  };
+
+  const handleHostDoubleClick = (host) => {
+    // Cancel the single click action
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+      clickTimeoutRef.current = null;
+    }
+    // Connect instantly
+    onConnectSSH(host);
   };
 
   // Kích hoạt chế độ thêm mới host
@@ -553,7 +574,7 @@ export default function HostsDashboard({
                               key={conn.id} 
                               className={`host-card connection-item ${isSelected ? 'selected' : ''}`}
                               onClick={() => handleHostClick(conn)}
-                              onDoubleClick={() => onConnectSSH(conn)}
+                              onDoubleClick={() => handleHostDoubleClick(conn)}
                               title="Double click to connect instantly"
                             >
                               <div className="host-card-icon">
