@@ -17,7 +17,7 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "description": "Last SSH - A modern SSH/SFTP client",
-  "author": "KienNT",
+  "author": "KienNT <kiennt@example.com>",
   "build": {
     "appId": "com.kiennt.lastssh",
     "productName": "Last SSH",
