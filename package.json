@@ -16,6 +16,31 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },
+  "description": "Last SSH - A modern SSH/SFTP client",
+  "author": "KienNT",
+  "build": {
+    "appId": "com.kiennt.lastssh",
+    "productName": "Last SSH",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "mac": {
+      "target": ["dmg", "zip"],
+      "category": "public.app-category.developer-tools"
+    },
+    "win": {
+      "target": ["nsis", "portable"]
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Development"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ]
+  },
   "dependencies": {
     "lucide-react": "^1.16.0",
     "peerjs": "^1.5.5",
