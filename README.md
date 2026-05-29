@@ -21,7 +21,7 @@ A modern Desktop application for managing SSH and SFTP servers, built with Elect
 
 ## 📦 Development Setup
 
-Prerequisites: **Node.js** installed (version 20+ recommended).
+Prerequisites: **Node.js** installed (version 24+ recommended).
 
 1. Clone this repository to your machine.
 2. Open the terminal and install the dependencies:
