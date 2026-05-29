@@ -7,7 +7,15 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 export default defineConfig([
   globalIgnores(['dist']),
   {
+    files: ['dev.js', 'electron/**/*.{js,cjs}'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
+  {
     files: ['**/*.{js,jsx}'],
+    ignores: ['dev.js', 'electron/**'],
     extends: [
       js.configs.recommended,
       reactHooks.configs.flat.recommended,

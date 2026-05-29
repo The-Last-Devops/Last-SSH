@@ -78,17 +78,51 @@ class P2PService {
     try {
       // Import động PeerJS để tránh lỗi import trong Node.js testing
       const { Peer } = await import('peerjs');
-      
+
       const peerOptions = {
         host: '0.peerjs.com',
         port: 443,
         secure: true,
-        debug: 1 // Chỉ hiện thị lỗi nghiêm trọng
+        debug: 0,
+        config: {
+          iceServers: [
+            // STUN servers (Google)
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            // Free TURN servers — giúp kết nối qua strict NAT/firewall
+            {
+              urls: 'turn:openrelay.metered.ca:80',
+              username: 'openrelayproject',
+              credential: 'openrelayproject'
+            },
+            {
+              urls: 'turn:openrelay.metered.ca:443',
+              username: 'openrelayproject',
+              credential: 'openrelayproject'
+            },
+            {
+              urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+              username: 'openrelayproject',
+              credential: 'openrelayproject'
+            },
+          ]
+        }
       };
 
       this.peer = customId ? new Peer(customId, peerOptions) : new Peer(peerOptions);
 
+      // Timeout 12 giây — nếu signaling server không phản hồi thì báo lỗi rõ ràng
+      const initTimeout = setTimeout(() => {
+        if (!this.peerId) {
+          try { this.peer?.destroy(); } catch { /* ignore */ }
+          this.peer = null;
+          if (this.onError) this.onError('Không thể kết nối đến máy chủ tín hiệu (0.peerjs.com). Kiểm tra kết nối internet và thử lại.');
+        }
+      }, 12000);
+
       this.peer.on('open', (id) => {
+        clearTimeout(initTimeout);
         this.peerId = id;
         this.isConnecting = false;
         if (this.onIdReady) this.onIdReady(id);
@@ -99,8 +133,12 @@ class P2PService {
       });
 
       this.peer.on('error', (err) => {
+        clearTimeout(initTimeout);
         console.error('Lỗi PeerJS:', err);
-        if (this.onError) this.onError(err.message || 'Lỗi kết nối PeerJS');
+        const msg = err.type === 'network' || err.type === 'server-error'
+          ? 'Mất kết nối đến máy chủ tín hiệu. Kiểm tra internet và thử lại.'
+          : (err.message || 'Lỗi kết nối P2P');
+        if (this.onError) this.onError(msg);
       });
 
       this.peer.on('disconnected', () => {
@@ -108,7 +146,7 @@ class P2PService {
       });
 
     } catch (e) {
-      console.warn('Không thể khởi tạo PeerJS thật, chuyển sang chế độ Mock:', e);
+      console.warn('Không thể khởi tạo PeerJS:', e);
       this.isMock = true;
       this.peerId = 'mock-peer-' + Math.floor(1000 + Math.random() * 9000);
       if (this.onIdReady) this.onIdReady(this.peerId);

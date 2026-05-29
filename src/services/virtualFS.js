@@ -1,3 +1,5 @@
+import { storageService } from './storageService.js';
+
 const DEFAULT_FS = {
   name: '/',
   type: 'dir',
@@ -113,9 +115,7 @@ class VirtualFS {
   save() {
     if (this.isInMemory) return;
     try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(this.fs));
-      }
+      storageService.setItem(STORAGE_KEY, JSON.stringify(this.fs));
     } catch (e) {
       console.error('Không thể lưu Virtual FS vào LocalStorage:', e);
     }

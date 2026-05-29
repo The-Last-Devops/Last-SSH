@@ -7,6 +7,32 @@ const pty = require('node-pty');
 // Known hosts for TOFU verification
 let knownHosts = {};
 
+// File-based key-value store (thay thế localStorage flush — ghi disk ngay lập tức)
+let storeCache = null;
+
+function getStorePath() {
+  return path.join(app.getPath('userData'), 'store.json');
+}
+
+function loadStoreCache() {
+  if (storeCache) return storeCache;
+  try {
+    const p = getStorePath();
+    storeCache = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : {};
+  } catch {
+    storeCache = {};
+  }
+  return storeCache;
+}
+
+function flushStoreCache() {
+  try {
+    fs.writeFileSync(getStorePath(), JSON.stringify(storeCache), 'utf8');
+  } catch (err) {
+    console.error('[store] flush failed:', err);
+  }
+}
+
 // Pending terminal resizes: tabId -> { cols, rows }
 // Lưu resize gửi trước khi shell SSH được mở, apply ngay khi shell ready
 const pendingResizes = {};
@@ -21,7 +47,7 @@ function loadKnownHosts() {
     if (fs.existsSync(p)) {
       knownHosts = JSON.parse(fs.readFileSync(p, 'utf8'));
     }
-  } catch (_e) {
+  } catch {
     knownHosts = {};
   }
 }
@@ -29,7 +55,7 @@ function loadKnownHosts() {
 function saveKnownHosts() {
   try {
     fs.writeFileSync(getKnownHostsPath(), JSON.stringify(knownHosts, null, 2));
-  } catch (_e) {}
+  } catch { /* ignore */ }
 }
 
 // Set app name (fixes "Electron" label in dock during development)
@@ -43,9 +69,6 @@ let mainWindow = null;
 const sshSessions = {}; // tabId -> { client, stream, sftp }
 const localSessions = {}; // tabId -> pty process
 
-// Legacy globals để tương thích với SFTP operations cũ (sẽ dùng session mới nhất)
-let activeSSHClient = null;
-let activeShellStream = null;
 let activeSFTP = null;
 
 function createWindow() {
@@ -55,7 +78,9 @@ function createWindow() {
     height: 800,
     title: 'Last SSH',
     icon: iconPath,
-    backgroundColor: '#16161e',
+    backgroundColor: '#f5f5f7',
+    titleBarStyle: 'hidden',
+    trafficLightPosition: { x: 14, y: 12 },
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -102,26 +127,20 @@ function cleanupSession(tabId) {
     if (session.stream) {
       session.stream.end();
     }
-  } catch (_e) { /* ignore */ }
+  } catch { /* ignore */ }
 
   try {
     if (session.client) {
       session.client.end();
     }
-  } catch (_e) { /* ignore */ }
+  } catch { /* ignore */ }
 
   delete sshSessions[tabId];
 
-  // Cập nhật legacy globals
   const remaining = Object.values(sshSessions);
   if (remaining.length > 0) {
-    const last = remaining[remaining.length - 1];
-    activeSSHClient = last.client;
-    activeShellStream = last.stream;
-    activeSFTP = last.sftp;
+    activeSFTP = remaining[remaining.length - 1].sftp;
   } else {
-    activeSSHClient = null;
-    activeShellStream = null;
     activeSFTP = null;
   }
 }
@@ -132,7 +151,7 @@ function cleanupLocalSession(tabId) {
 
   try {
     session.kill();
-  } catch (_e) { /* ignore */ }
+  } catch { /* ignore */ }
 
   delete localSessions[tabId];
 }
@@ -142,8 +161,32 @@ function cleanupSSH() {
   Object.keys(sshSessions).forEach(tabId => cleanupSession(tabId));
 }
 
+// --------------------------------------------------------------------------
+// IPC STORE — file-based key-value, ghi disk đồng bộ (không cần flush Chromium)
+// --------------------------------------------------------------------------
+ipcMain.handle('store-get-all', () => ({ ...loadStoreCache() }));
+
+ipcMain.handle('store-set', (_, key, value) => {
+  loadStoreCache()[key] = value;
+  flushStoreCache();
+  return true;
+});
+
+ipcMain.handle('store-remove', (_, key) => {
+  delete loadStoreCache()[key];
+  flushStoreCache();
+  return true;
+});
+
+ipcMain.handle('store-clear', () => {
+  storeCache = {};
+  flushStoreCache();
+  return true;
+});
+
 app.whenReady().then(() => {
   loadKnownHosts();
+  loadStoreCache(); // pre-load store vào cache
   createWindow();
 
   app.on('activate', () => {
@@ -157,6 +200,35 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+let isQuitting = false;
+
+// Đảm bảo flush dữ liệu LocalStorage trước khi thoát
+app.on('before-quit', async (e) => {
+  if (isQuitting) return; // Nếu đã flush xong và đang gọi lại app.quit() thì bỏ qua
+
+  e.preventDefault(); // Ngăn ứng dụng đóng ngay lập tức
+  
+  try {
+    const { session } = require('electron');
+    if (session.defaultSession) {
+      await session.defaultSession.flushStorageData(); // Đợi flush xong
+    }
+  } catch (err) {
+    console.error('Lỗi flush storage:', err);
+  } finally {
+    isQuitting = true; // Đánh dấu đã flush xong
+    app.quit(); // Đóng ứng dụng an toàn
+  }
+});
+
+// Xử lý khi bị kill bằng lệnh từ terminal (Ctrl+C trong môi trường Dev)
+process.on('SIGINT', () => {
+  app.quit();
+});
+process.on('SIGTERM', () => {
+  app.quit();
 });
 
 // --------------------------------------------------------------------------
@@ -174,8 +246,7 @@ ipcMain.on('ssh-connect', (event, profile) => {
   const client = new Client();
   sshSessions[tabId] = { client, stream: null, sftp: null };
 
-  // Cập nhật legacy global cho SFTP operations
-  activeSSHClient = client;
+
 
   const host = (profile.host || '').trim();
   const port = parseInt(profile.port, 10);
@@ -243,14 +314,13 @@ ipcMain.on('ssh-connect', (event, profile) => {
       }
 
       sshSessions[tabId].stream = stream;
-      activeShellStream = stream;
 
       // Apply pending resize nếu renderer đã gửi resize trước khi shell mở xong
       if (pendingResizes[tabId]) {
         const { cols, rows } = pendingResizes[tabId];
         delete pendingResizes[tabId];
         if (cols > 0 && rows > 0) {
-          try { stream.setWindow(rows, cols, 0, 0); } catch (_e) {}
+          try { stream.setWindow(rows, cols, 0, 0); } catch { /* ignore */ }
         }
       }
 
@@ -331,8 +401,8 @@ ipcMain.on('ssh-write', (event, { tabId, data }) => {
   if (session && session.stream) {
     try {
       session.stream.write(data);
-    } catch (_e) {
-      console.error('Lỗi ghi dữ liệu SSH:', _e.message);
+    } catch (err) {
+      console.error('Lỗi ghi dữ liệu SSH:', err.message);
     }
   }
 });
@@ -348,7 +418,7 @@ ipcMain.on('ssh-resize', (event, { tabId, cols, rows }) => {
   const session = sshSessions[tabId];
   const stream = session ? session.stream : null;
   if (stream) {
-    try { stream.setWindow(rows, cols, 0, 0); } catch (_e) {}
+    try { stream.setWindow(rows, cols, 0, 0); } catch { /* ignore */ }
   } else {
     // Shell chưa mở — lưu lại, sẽ apply ngay khi shell ready
     pendingResizes[tabId] = { cols, rows };
@@ -364,6 +434,18 @@ ipcMain.handle('ssh-forget-host', (event, hostPort) => {
 
 ipcMain.handle('ssh-get-known-hosts', () => {
   return { ...knownHosts };
+});
+
+ipcMain.handle('flush-storage', async () => {
+  try {
+    const { session } = require('electron');
+    if (session.defaultSession) {
+      await session.defaultSession.flushStorageData();
+    }
+    return true;
+  } catch {
+    return false;
+  }
 });
 
 ipcMain.on('local-shell-connect', (event, { tabId, cwd, shell }) => {
@@ -385,7 +467,7 @@ ipcMain.on('local-shell-connect', (event, { tabId, cwd, shell }) => {
   const userShell = shellCandidates.find((candidate) => {
     try {
       return fs.existsSync(candidate);
-    } catch (_e) {
+    } catch {
       return false;
     }
   }) || shellCandidates[shellCandidates.length - 1];
@@ -436,8 +518,8 @@ ipcMain.on('local-write', (event, { tabId, data }) => {
   if (session) {
     try {
       session.write(data);
-    } catch (_e) {
-      console.error('Lỗi ghi dữ liệu local shell:', _e.message);
+    } catch (err) {
+      console.error('Lỗi ghi dữ liệu local shell:', err.message);
     }
   }
 });
@@ -447,9 +529,7 @@ ipcMain.on('local-resize', (event, { tabId, cols, rows }) => {
   if (session && cols > 0 && rows > 0) {
     try {
       session.resize(cols, rows);
-    } catch (_e) {
-      // Ignore resize errors
-    }
+    } catch { /* ignore */ }
   }
 });
 
@@ -488,15 +568,23 @@ ipcMain.handle('sftp-list', async (event, remotePath) => {
         return reject(err);
       }
 
-      // Format dữ liệu tương thích với SFTPBrowser
       const formatted = list.map(item => {
         const isDir = item.longname.startsWith('d');
+        // Extract permission string (first 10 chars of longname e.g. drwxr-xr-x)
+        const perms = item.longname.split(' ')[0] || '';
         return {
           name: item.filename,
           type: isDir ? 'dir' : 'file',
           size: item.attrs.size,
-          updatedAt: new Date(item.attrs.mtime * 1000).toISOString()
+          updatedAt: new Date(item.attrs.mtime * 1000).toISOString(),
+          permissions: perms,
         };
+      });
+
+      // Sort: dirs first, then files, alphabetically
+      formatted.sort((a, b) => {
+        if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
+        return a.name.localeCompare(b.name);
       });
 
       resolve(formatted);

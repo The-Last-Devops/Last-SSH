@@ -1,36 +1,67 @@
-import { useState, useEffect, useCallback } from 'react';
-import { 
-  Folder, 
-  File, 
-  FileText, 
-  FileCode, 
-  ArrowLeft, 
-  Upload, 
-  FolderPlus, 
-  Trash2, 
-  Network 
-} from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Upload, FolderPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { sshSimulator } from '../services/sshSimulator.js';
 import './SFTPBrowser.css';
 
-export default function SFTPBrowser({
-  tabId,
-  currentPath = '',
-  onNavigate,
-  onTerminalLog // Callback để in log ra terminal khi người dùng thực hiện thao tác visual
-}) {
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function formatSize(bytes) {
+  if (bytes === undefined || bytes === null) return '—';
+  if (bytes === 0) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} kB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+
+function formatDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('en-US', {
+    month: 'numeric', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true,
+  });
+}
+
+function getKind(item) {
+  if (item.type === 'dir') return 'folder';
+  const ext = item.name.split('.').pop().toLowerCase();
+  return ext || 'file';
+}
+
+// Blue macOS-style folder SVG
+function FolderIcon() {
+  return (
+    <svg width="20" height="18" viewBox="0 0 20 18" fill="none">
+      <path d="M0 3C0 1.9 0.9 1 2 1H7.17C7.70 1 8.21 1.21 8.59 1.59L9.41 2.41C9.79 2.79 10.30 3 10.83 3H18C19.1 3 20 3.9 20 5V15C20 16.1 19.1 17 18 17H2C0.9 17 0 16.1 0 15V3Z" fill="#1d4ed8"/>
+      <path d="M0 5C0 3.9 0.9 3 2 3H18C19.1 3 20 3.9 20 5V15C20 16.1 19.1 17 18 17H2C0.9 17 0 16.1 0 15V5Z" fill="#3b82f6"/>
+    </svg>
+  );
+}
+
+// Plain file SVG
+function FileIcon() {
+  return (
+    <svg width="16" height="20" viewBox="0 0 16 20" fill="none">
+      <path d="M2 0H10L16 6V18C16 19.1 15.1 20 14 20H2C0.9 20 0 19.1 0 18V2C0 0.9 0.9 0 2 0Z" fill="#E8E8E8" stroke="#C8C8C8" strokeWidth="0.5"/>
+      <path d="M10 0L16 6H12C10.9 6 10 5.1 10 4V0Z" fill="#C8C8C8"/>
+    </svg>
+  );
+}
+
+export default function SFTPBrowser({ tabId, currentPath = '', onNavigate, onTerminalLog }) {
   const isDesktop = typeof window !== 'undefined' && window.electronAPI !== undefined;
   const [items, setItems] = useState([]);
   const [dragActive, setDragActive] = useState(false);
-  const [isSftpReady, setIsSftpReady] = useState(!isDesktop); // Trên browser: luôn ready; Desktop: chờ signal
+  const [isSftpReady, setIsSftpReady] = useState(!isDesktop);
   const [sftpError, setSftpError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showMkdirInput, setShowMkdirInput] = useState(false);
+  const [mkdirName, setMkdirName] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(null);
+  const [history, setHistory] = useState([]);
+  const uploadInputRef = useRef(null);
 
-  // Load tệp tin từ SSH session mỗi khi thay đổi path hoặc tabId
   const loadFiles = useCallback(async () => {
-    if (!tabId || !currentPath) return;
-    if (!isSftpReady) return; // Chưa sẵn sàng, không gọi
-
+    if (!tabId || !currentPath || !isSftpReady) return;
     setIsLoading(true);
     if (isDesktop) {
       try {
@@ -38,417 +69,302 @@ export default function SFTPBrowser({
         setItems(fileList);
         setSftpError(null);
       } catch (err) {
-        console.error("Lỗi sftpList:", err);
         setSftpError(err.message);
-        if (onTerminalLog) {
-          onTerminalLog(`\r\nsftp error: Không thể liệt kê thư mục: ${err.message}`);
-        }
+        if (onTerminalLog) onTerminalLog(`\r\nsftp error: ${err.message}`);
       } finally {
         setIsLoading(false);
       }
     } else {
-      const fileList = sshSimulator.sftpList(tabId, currentPath);
-      setItems(fileList);
+      setItems(sshSimulator.sftpList(tabId, currentPath));
       setIsLoading(false);
     }
   }, [tabId, currentPath, isDesktop, onTerminalLog, isSftpReady]);
 
-  // Lắng nghe sự kiện sftp-ready từ Electron (chỉ khi chạy Desktop)
-  // Khi tabId thay đổi, unsubscribe listener cũ và đăng ký listener mới
   useEffect(() => {
     if (!isDesktop) {
-      // Không phải Desktop - browser mode luôn sẵn sàng, load ngay
       const run = async () => { await loadFiles(); };
       run();
       return;
     }
-
-    let isMounted = true;
-
-    const checkStatus = async () => {
-      try {
-        const status = await window.electronAPI.sftpStatus();
-        if (isMounted && status && status.ready) {
-          setIsSftpReady(true);
-          setSftpError(null);
-        }
-      } catch (err) {
-        if (isMounted) {
-          setSftpError(err.message);
-          setIsSftpReady(false);
-        }
-      }
+    let mounted = true;
+    window.electronAPI.sftpStatus().then(s => {
+      if (mounted && s?.ready) setIsSftpReady(true);
+    }).catch(() => {});
+    const handleSftpReady = (r) => {
+      if (r?.success) { setIsSftpReady(true); setSftpError(null); }
+      else { setSftpError(r?.error || 'SFTP unavailable'); setIsSftpReady(false); }
     };
-
-    checkStatus();
-
-    // Subscribe listener sftp-ready
-    const removeSftpReadyListener = window.electronAPI.onSFTPReady((result) => {
-      if (result && result.success) {
-        setIsSftpReady(true);
-        setSftpError(null);
-      } else {
-        setSftpError(result?.error || 'Server không hỗ trợ SFTP subsystem');
-        setIsSftpReady(false);
-      }
-    });
-
-    return () => {
-      isMounted = false;
-      removeSftpReadyListener();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const unsub = window.electronAPI.onSFTPReady(handleSftpReady);
+    return () => { mounted = false; unsub(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId, isDesktop]);
 
-  // Load files mỗi khi isSftpReady chuyển sang true hoặc currentPath thay đổi
   useEffect(() => {
     if (!isSftpReady) return;
-    const run = async () => { await loadFiles(); };
-    run();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadFiles();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSftpReady, currentPath, tabId]);
 
+  // Navigation helpers
+  const navigate = (path) => {
+    setHistory(h => [...h, currentPath]);
+    onNavigate(path);
+  };
 
-  // Click vào mục (thư mục thì cd, file thì download)
+  const goBack = () => {
+    if (history.length === 0) return;
+    const prev = history[history.length - 1];
+    setHistory(h => h.slice(0, -1));
+    onNavigate(prev);
+  };
+
+  const goUp = () => {
+    if (currentPath === '/' || !currentPath) return;
+    const lastSlash = currentPath.lastIndexOf('/');
+    navigate(currentPath.slice(0, lastSlash) || '/');
+  };
+
   const handleItemClick = (item) => {
     if (item.type === 'dir') {
-      const nextPath = currentPath === '/' ? `/${item.name}` : `${currentPath}/${item.name}`;
-      onNavigate(nextPath);
-      if (onTerminalLog) {
-        onTerminalLog(`\r\nsftp: Visual navigate to ${nextPath}`);
-      }
+      const next = currentPath === '/' ? `/${item.name}` : `${currentPath}/${item.name}`;
+      navigate(next);
+      if (onTerminalLog) onTerminalLog(`\r\nsftp: cd ${next}`);
     } else {
       handleDownload(item.name);
     }
   };
 
-  // Trở lại thư mục cha (cd ..)
-  const handleBackClick = () => {
-    if (currentPath === '/' || !currentPath) return;
-    const lastSlash = currentPath.lastIndexOf('/');
-    const nextPath = currentPath.slice(0, lastSlash) || '/';
-    onNavigate(nextPath);
-    if (onTerminalLog) {
-      onTerminalLog(`\r\nsftp: Visual navigate back to ${nextPath}`);
-    }
-  };
+  const readFileContent = (file) => new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = (e) => resolve(e.target.result);
+    r.onerror = (e) => reject(e);
+    r.readAsText(file);
+  });
 
-  // Tạo thư mục mới trực quan
-  const handleMkdir = async () => {
-    const name = prompt('Nhập tên thư mục mới trên server:');
-    if (!name || name.trim() === '') return;
-
+  const handleMkdirSubmit = async () => {
+    const name = mkdirName.trim();
+    if (!name) return;
+    setShowMkdirInput(false); setMkdirName('');
     if (isDesktop) {
-      try {
-        const success = await window.electronAPI.sftpMkdir(currentPath, name.trim());
-        if (success) {
-          loadFiles();
-          if (onTerminalLog) {
-            onTerminalLog(`\r\nsftp: Created remote directory '${name.trim()}' visually.`);
-          }
-        }
-      } catch (err) {
-        alert('Không thể tạo thư mục: ' + err.message);
-      }
+      try { await window.electronAPI.sftpMkdir(currentPath, name); loadFiles(); }
+      catch (err) { alert('Cannot create folder: ' + err.message); }
     } else {
-      const success = sshSimulator.sftpMkdir(tabId, currentPath, name.trim());
-      if (success) {
-        loadFiles();
-        if (onTerminalLog) {
-          onTerminalLog(`\r\nsftp: Created remote directory '${name.trim()}' visually.`);
-        }
-      } else {
-        alert('Không thể tạo thư mục (trùng tên hoặc lỗi)');
-      }
+      sshSimulator.sftpMkdir(tabId, currentPath, name);
+      loadFiles();
     }
+    if (onTerminalLog) onTerminalLog(`\r\nsftp: mkdir ${name}`);
   };
 
-  // Tải file (Download)
+  const handleUploadClick = () => uploadInputRef.current?.click();
+
+  const handleUploadFileChange = async (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length) return;
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      setUploadProgress({ current: i + 1, total: files.length, filename: file.name, done: false });
+      try {
+        const content = await readFileContent(file);
+        if (isDesktop) await window.electronAPI.sftpUpload(currentPath, file.name, content);
+        else sshSimulator.sftpUpload(tabId, currentPath, file.name, content);
+        if (onTerminalLog) onTerminalLog(`\r\nsftp: uploaded '${file.name}' (${formatSize(file.size)})`);
+      } catch (err) {
+        setUploadProgress(null);
+        alert(`Cannot upload '${file.name}': ` + err.message);
+        return;
+      }
+    }
+    setUploadProgress({ current: files.length, total: files.length, filename: '', done: true });
+    setTimeout(() => setUploadProgress(null), 1800);
+    loadFiles();
+  };
+
   const handleDownload = async (fileName) => {
-    if (isDesktop) {
-      try {
-        const content = await window.electronAPI.sftpDownload(currentPath, fileName);
-        if (content === null) return;
-
-        // Tạo blob tải file thật về máy người dùng
-        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-
-        if (onTerminalLog) {
-          onTerminalLog(`\r\nsftp: Downloaded remote file '${fileName}' (size: ${content.length} bytes).`);
-        }
-      } catch (err) {
-        alert('Không thể tải xuống file: ' + err.message);
-      }
-    } else {
-      const content = sshSimulator.sftpDownload(tabId, currentPath, fileName);
+    try {
+      const content = isDesktop
+        ? await window.electronAPI.sftpDownload(currentPath, fileName)
+        : sshSimulator.sftpDownload(tabId, currentPath, fileName);
       if (content === null) return;
-
-      // Tạo blob tải file thật về máy người dùng
       const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      if (onTerminalLog) {
-        onTerminalLog(`\r\nsftp: Downloaded remote file '${fileName}' (size: ${content.length} bytes).`);
-      }
-    }
+      const a = document.createElement('a');
+      a.href = url; a.download = fileName;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
+      if (onTerminalLog) onTerminalLog(`\r\nsftp: downloaded '${fileName}'`);
+    } catch (err) { alert('Cannot download: ' + err.message); }
   };
 
-  // Upload (tạo file nhập tay)
-  const handleUploadClick = async () => {
-    const name = prompt('Nhập tên file mới để upload:');
-    if (!name || name.trim() === '') return;
-    const content = prompt('Nhập nội dung tệp tin:');
-    
+  const handleDelete = async (e, item) => {
+    e.stopPropagation();
+    if (!confirm(`Delete '${item.name}' on remote server?`)) return;
     if (isDesktop) {
-      try {
-        const success = await window.electronAPI.sftpUpload(currentPath, name.trim(), content || '');
-        if (success) {
-          loadFiles();
-          if (onTerminalLog) {
-            onTerminalLog(`\r\nsftp: Uploaded file '${name.trim()}' visually.`);
-          }
-        }
-      } catch (err) {
-        alert('Không thể upload file: ' + err.message);
-      }
+      try { await window.electronAPI.sftpRm(currentPath, item.name); loadFiles(); }
+      catch (err) { alert('Cannot delete: ' + err.message); }
     } else {
-      const success = sshSimulator.sftpUpload(tabId, currentPath, name.trim(), content || '');
-      if (success) {
-        loadFiles();
-        if (onTerminalLog) {
-          onTerminalLog(`\r\nsftp: Uploaded file '${name.trim()}' visually.`);
-        }
-      }
+      sshSimulator.sftpRm(tabId, currentPath, item.name);
+      loadFiles();
     }
+    if (onTerminalLog) onTerminalLog(`\r\nsftp: rm ${item.name}`);
   };
 
-  // Xóa file/folder visual
-  const handleDelete = async (e, name) => {
-    e.stopPropagation();
-    if (confirm(`Bạn chắc chắn muốn xóa mục '${name}' trên remote server?`)) {
-      if (isDesktop) {
-        try {
-          const success = await window.electronAPI.sftpRm(currentPath, name);
-          if (success) {
-            loadFiles();
-            if (onTerminalLog) {
-              onTerminalLog(`\r\nsftp: Removed remote item '${name}' visually.`);
-            }
-          }
-        } catch (err) {
-          alert('Không thể xóa mục: ' + err.message);
-        }
-      } else {
-        const success = sshSimulator.sftpRm(tabId, currentPath, name);
-        if (success) {
-          loadFiles();
-          if (onTerminalLog) {
-            onTerminalLog(`\r\nsftp: Removed remote item '${name}' visually.`);
-          }
-        }
-      }
-    }
-  };
-
-  // -------------------------------------------------------------
-  // KÉO THẢ TỆP TIN THẬT (REAL DRAG & DROP FILE READER)
-  // -------------------------------------------------------------
   const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
+    e.preventDefault(); e.stopPropagation();
+    setDragActive(e.type === 'dragenter' || e.type === 'dragover');
   };
 
   const handleDrop = async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const files = Array.from(e.dataTransfer.files);
-      
-      for (const file of files) {
-        try {
-          const content = await readFileContent(file);
-          if (isDesktop) {
-            await window.electronAPI.sftpUpload(currentPath, file.name, content);
-            if (onTerminalLog) {
-              onTerminalLog(`\r\nsftp: Dropped & Uploaded file '${file.name}' (${file.size} bytes) from your device successfully!`);
-            }
-          } else {
-            sshSimulator.sftpUpload(tabId, currentPath, file.name, content);
-            if (onTerminalLog) {
-              onTerminalLog(`\r\nsftp: Dropped & Uploaded file '${file.name}' (${file.size} bytes) from your device successfully!`);
-            }
-          }
-        } catch (err) {
-          console.error('Không thể đọc hoặc upload file:', err);
-          if (onTerminalLog) {
-            onTerminalLog(`\r\nsftp error: Lỗi tải lên file thả vào: ${err.message}`);
-          }
-        }
-      }
-      loadFiles();
+    e.preventDefault(); e.stopPropagation(); setDragActive(false);
+    const files = Array.from(e.dataTransfer.files || []);
+    if (!files.length) return;
+    for (const file of files) {
+      try {
+        const content = await readFileContent(file);
+        if (isDesktop) await window.electronAPI.sftpUpload(currentPath, file.name, content);
+        else sshSimulator.sftpUpload(tabId, currentPath, file.name, content);
+        if (onTerminalLog) onTerminalLog(`\r\nsftp: dropped & uploaded '${file.name}'`);
+      } catch (err) { if (onTerminalLog) onTerminalLog(`\r\nsftp error: ${err.message}`); }
     }
+    loadFiles();
   };
 
-  // Đọc nội dung tệp tin cục bộ từ drag-drop
-  const readFileContent = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result);
-      reader.onerror = (e) => reject(e);
-      // Đọc dạng text (nếu file nhị phân sẽ mô phỏng chuỗi raw)
-      reader.readAsText(file);
-    });
-  };
-
-  // Xác định icon tệp tin
-  const getItemIcon = (item) => {
-    if (item.type === 'dir') return <Folder size={16} className="sftp-item-icon text-[var(--term-blue)]" />;
-
-    const ext = item.name.split('.').pop().toLowerCase();
-    if (['html', 'css', 'js', 'jsx', 'ts', 'tsx', 'json', 'sql'].includes(ext)) {
-      return <FileCode size={16} className="sftp-item-icon text-term-green" />;
-    }
-    if (['txt', 'md', 'log'].includes(ext)) {
-      return <FileText size={16} className="sftp-item-icon text-text-main" />;
-    }
-    return <File size={16} className="sftp-item-icon" />;
-  };
+  // Breadcrumb parts
+  const pathParts = currentPath.split('/').filter(Boolean);
 
   return (
-    <div className="sftp-container">
-      {/* SFTP Header */}
-      <div className="sftp-header">
-        <div className="sftp-title-row">
-          <span className="sftp-title-text">
-            <Network size={14} className="text-accent" />
-            SFTP FILE EXPLORER
-          </span>
-          <div className="sftp-controls">
-            <button
-              className="glass-button px-2 py-1"
-              onClick={handleMkdir}
-              title="Create Folder"
-            >
-              <FolderPlus size={14} />
-            </button>
-            <button
-              className="glass-button px-2 py-1"
-              onClick={handleUploadClick}
-              title="Upload File"
-            >
-              <Upload size={14} />
-            </button>
-          </div>
-        </div>
+    <div className="sftp-container" onDragEnter={handleDrag} onDragOver={handleDrag} onDragLeave={handleDrag} onDrop={handleDrop}>
+      <input ref={uploadInputRef} type="file" multiple style={{ display: 'none' }} onChange={handleUploadFileChange} />
 
-        {/* Current Path with Back Button */}
-        <div className="sftp-path-row">
-          <button 
-            className="sftp-back-btn" 
-            onClick={handleBackClick}
-            disabled={currentPath === '/' || !currentPath}
-            title="Go to parent directory"
-          >
-            <ArrowLeft size={12} />
+      {/* ── Toolbar ── */}
+      <div className="sftp-toolbar">
+        <div className="sftp-nav-btns">
+          <button className="sftp-nav-btn" onClick={goBack} disabled={history.length === 0} title="Back">
+            <ChevronLeft size={15} strokeWidth={2.5} />
           </button>
-          <span className="sftp-path-text">{currentPath}</span>
+          <button className="sftp-nav-btn" onClick={goUp} disabled={currentPath === '/' || !currentPath} title="Up">
+            <ChevronRight size={15} strokeWidth={2.5} style={{ transform: 'rotate(90deg)' }} />
+          </button>
+        </div>
+
+        {/* Breadcrumb */}
+        <div className="sftp-breadcrumb">
+          <button className="sftp-crumb" onClick={() => navigate('/')}>
+            <FolderIcon /> <span>/</span>
+          </button>
+          {pathParts.map((part, i) => {
+            const fullPath = '/' + pathParts.slice(0, i + 1).join('/');
+            return (
+              <span key={fullPath} className="sftp-crumb-row">
+                <span className="sftp-crumb-sep">›</span>
+                <button className="sftp-crumb" onClick={() => navigate(fullPath)}>
+                  <FolderIcon /> <span>{part}</span>
+                </button>
+              </span>
+            );
+          })}
+        </div>
+
+        {/* Action buttons */}
+        <div className="sftp-toolbar-actions">
+          <button className="sftp-action-btn" onClick={() => { setShowMkdirInput(v => !v); setMkdirName(''); }} title="New Folder">
+            <FolderPlus size={14} />
+          </button>
+          <button className="sftp-action-btn" onClick={handleUploadClick} title="Upload">
+            <Upload size={14} />
+          </button>
         </div>
       </div>
 
-      {/* Visual File Area */}
+      {/* ── Mkdir inline ── */}
+      {showMkdirInput && (
+        <div className="sftp-mkdir-row">
+          <input className="sftp-mkdir-input" placeholder="New folder name..." value={mkdirName}
+            onChange={e => setMkdirName(e.target.value)} autoFocus
+            onKeyDown={e => { if (e.key === 'Enter') handleMkdirSubmit(); if (e.key === 'Escape') { setShowMkdirInput(false); setMkdirName(''); } }}
+          />
+          <button className="sftp-mkdir-ok" onClick={handleMkdirSubmit}>Create</button>
+          <button className="sftp-mkdir-cancel" onClick={() => { setShowMkdirInput(false); setMkdirName(''); }}>✕</button>
+        </div>
+      )}
+
+      {/* ── Upload progress ── */}
+      {uploadProgress && (
+        <div className="sftp-upload-progress">
+          <div className="sftp-upload-progress__bar-wrap">
+            <div className="sftp-upload-progress__bar" style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }} />
+          </div>
+          <div className="sftp-upload-progress__label">
+            {uploadProgress.done ? `✓ Uploaded ${uploadProgress.total} file(s)` : `Uploading ${uploadProgress.current}/${uploadProgress.total}: ${uploadProgress.filename}`}
+          </div>
+        </div>
+      )}
+
+      {/* ── Column headers ── */}
+      <div className="sftp-col-header">
+        <div className="sftp-col sftp-col--name">Name</div>
+        <div className="sftp-col sftp-col--date">Date Modified</div>
+        <div className="sftp-col sftp-col--size">Size</div>
+        <div className="sftp-col sftp-col--kind">Kind</div>
+      </div>
+
+      {/* ── File list ── */}
       <div className="sftp-file-area">
-        {/* Trạng thái: Đang chờ SFTP kết nối */}
+        {/* Status: waiting */}
         {isDesktop && !isSftpReady && !sftpError && (
-          <div className="text-text-muted text-[11px] p-6 text-center">
-            <div className="mb-2 opacity-60">⏳</div>
-            Đang chờ SFTP session sẵn sàng...
-          </div>
+          <div className="sftp-status">⏳ Waiting for SFTP session...</div>
         )}
-
-        {/* Trạng thái: Lỗi SFTP */}
         {sftpError && (
-          <div className="text-[#ff6b6b] text-[11px] p-4 text-center bg-[rgba(255,107,107,0.05)] m-2 rounded-md border border-[rgba(255,107,107,0.15)]">
-            <div className="mb-1 text-sm">⚠️</div>
-            <div className="font-bold mb-1">SFTP không khả dụng</div>
-            <div className="opacity-80 text-[10px]">{sftpError}</div>
-          </div>
+          <div className="sftp-status sftp-status--error">⚠️ {sftpError}</div>
         )}
-
-        {/* Trạng thái: Đang tải */}
         {isLoading && (
-          <div className="text-text-muted text-[11px] p-6 text-center">
-            <div className="mb-2 opacity-60">🔄</div>
-            Đang tải danh sách tệp tin...
-          </div>
+          <div className="sftp-status">Loading...</div>
         )}
 
-        {/* Danh sách tệp tin */}
         {!isLoading && isSftpReady && !sftpError && (
-          items.length === 0 ? (
-            <div className="text-text-muted text-[11px] p-6 text-center">
-              Empty directory
-            </div>
-          ) : (
-            items.map(item => (
-              <div 
-                key={item.name} 
-                className="sftp-item-row"
-                onClick={() => handleItemClick(item)}
-              >
-                <div className="sftp-item-left">
-                  {getItemIcon(item)}
-                  <span className="sftp-item-name">{item.name}</span>
+          <>
+            {/* Back row (..) */}
+            {currentPath !== '/' && currentPath && (
+              <div className="sftp-row" onClick={goUp}>
+                <div className="sftp-col sftp-col--name">
+                  <span className="sftp-row-icon"><FolderIcon /></span>
+                  <span className="sftp-row-name">..</span>
                 </div>
-                <div className="sftp-item-right">
-                  {item.type === 'file' && (
-                    <span className="sftp-item-size">{item.size} B</span>
-                  )}
-                  <button 
-                    className="sftp-delete-btn"
-                    onClick={(e) => handleDelete(e, item.name)}
-                    title={`Delete remote ${item.type}`}
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                </div>
+                <div className="sftp-col sftp-col--date" />
+                <div className="sftp-col sftp-col--size">- -</div>
+                <div className="sftp-col sftp-col--kind">folder</div>
               </div>
-            ))
-          )
+            )}
+
+            {items.length === 0 && (
+              <div className="sftp-status">Empty directory</div>
+            )}
+
+            {items.map(item => (
+              <div key={item.name} className={`sftp-row${item.type === 'dir' ? ' sftp-row--dir' : ''}`} onClick={() => handleItemClick(item)}>
+                <div className="sftp-col sftp-col--name">
+                  <span className="sftp-row-icon" title={item.permissions || ''}>
+                    {item.type === 'dir' ? <FolderIcon /> : <FileIcon />}
+                  </span>
+                  <div className="sftp-row-name-wrap">
+                    <span className="sftp-row-name">{item.name}</span>
+                  </div>
+                </div>
+                <div className="sftp-col sftp-col--date">{formatDate(item.updatedAt)}</div>
+                <div className="sftp-col sftp-col--size">{item.type === 'dir' ? '- -' : formatSize(item.size)}</div>
+                <div className="sftp-col sftp-col--kind">{getKind(item)}</div>
+                <button className="sftp-row-delete" onClick={(e) => handleDelete(e, item)} title="Delete">✕</button>
+              </div>
+            ))}
+          </>
         )}
       </div>
 
-      {/* Drag & Drop File Upload Area */}
-      <div 
-        className={`sftp-dropzone ${dragActive ? 'drag-active' : ''}`}
-        onDragEnter={handleDrag}
-        onDragOver={handleDrag}
-        onDragLeave={handleDrag}
-        onDrop={handleDrop}
-      >
-        <Upload size={18} className="sftp-dropzone-icon" />
-        <span>Kéo thả file thật từ máy tính của bạn vào đây để Upload trực tiếp</span>
+      {/* ── Drop zone ── */}
+      <div className={`sftp-dropzone${dragActive ? ' drag-active' : ''}`}>
+        <Upload size={16} className="sftp-dropzone-icon" />
+        <span>Drop files here to upload</span>
       </div>
     </div>
   );

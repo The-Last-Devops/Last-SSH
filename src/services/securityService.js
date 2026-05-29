@@ -1,4 +1,5 @@
 // securityService.js - Quản lý mã hóa dữ liệu AES-GCM và sinh trắc học WebAuthn
+import { storageService } from './storageService.js';
 
 const PIN_STORE_KEY = 'terminus_master_pin_exists';
 const ENCRYPTED_DATA_KEY = 'terminus_encrypted_payload';
@@ -87,10 +88,8 @@ class SecurityService {
       const dataString = JSON.stringify(initialData);
       const encrypted = await this.encrypt(dataString, pin);
 
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(PIN_STORE_KEY, 'true');
-        window.localStorage.setItem(ENCRYPTED_DATA_KEY, encrypted);
-      }
+      storageService.setItem(PIN_STORE_KEY, 'true');
+      storageService.setItem(ENCRYPTED_DATA_KEY, encrypted);
       this.isUnlocked = true;
       return true;
     } catch (e) {
@@ -150,9 +149,7 @@ class SecurityService {
       const dataString = JSON.stringify(data);
       const encrypted = await this.encryptWithDerivedKey(dataString, this.activeKey, this.activeKeySalt);
       
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(ENCRYPTED_DATA_KEY, encrypted);
-      }
+      storageService.setItem(ENCRYPTED_DATA_KEY, encrypted);
       return true;
     } catch (e) {
       console.error('Lỗi khi lưu dữ liệu mã hóa:', e);
@@ -162,12 +159,10 @@ class SecurityService {
 
   // Xóa sạch thông tin bảo mật (Factory Reset)
   resetSecurity() {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.removeItem(PIN_STORE_KEY);
-      window.localStorage.removeItem(ENCRYPTED_DATA_KEY);
-      window.localStorage.removeItem('terminus_biometrics_credentials');
-      window.localStorage.removeItem('terminus_biometrics_secret');
-    }
+    storageService.removeItem(PIN_STORE_KEY);
+    storageService.removeItem(ENCRYPTED_DATA_KEY);
+    storageService.removeItem('terminus_biometrics_credentials');
+    storageService.removeItem('terminus_biometrics_secret');
     this.isUnlocked = true;
     this.activeKey = null;
     this.activeKeySalt = null;
@@ -346,10 +341,8 @@ class SecurityService {
         encryptedPin: await this.encrypt(pin, biometricSecret)
       };
 
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem('terminus_biometrics_credentials', JSON.stringify(secureStore));
-        window.localStorage.setItem('terminus_biometrics_secret', biometricSecret);
-      }
+      storageService.setItem('terminus_biometrics_credentials', JSON.stringify(secureStore));
+      storageService.setItem('terminus_biometrics_secret', biometricSecret);
 
       return true;
     } catch (e) {

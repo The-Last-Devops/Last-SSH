@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import TabsBar from './components/TabsBar.jsx';
 import TerminalTab from './components/TerminalTab.jsx';
 import SFTPBrowser from './components/SFTPBrowser.jsx';
@@ -11,6 +11,7 @@ import { Settings, FolderSync, HardDrive } from 'lucide-react';
 import { securityService } from './services/securityService.js';
 import { virtualFS } from './services/virtualFS.js';
 import { sshSimulator } from './services/sshSimulator.js';
+import { storageService } from './services/storageService.js';
 
 import './App.css';
 
@@ -33,9 +34,9 @@ const STORAGE_KEYS = {
 
 const savePlainAppState = ({ connections = [], keys = [], identities = [] }) => {
   if (typeof window === 'undefined' || !window.localStorage) return;
-  localStorage.setItem(STORAGE_KEYS.CONNECTIONS_PLAIN, JSON.stringify(connections));
-  localStorage.setItem(STORAGE_KEYS.KEYS_PLAIN, JSON.stringify(keys));
-  localStorage.setItem(STORAGE_KEYS.IDENTITIES_PLAIN, JSON.stringify(identities));
+  storageService.setItem(STORAGE_KEYS.CONNECTIONS_PLAIN, JSON.stringify(connections));
+  storageService.setItem(STORAGE_KEYS.KEYS_PLAIN, JSON.stringify(keys));
+  storageService.setItem(STORAGE_KEYS.IDENTITIES_PLAIN, JSON.stringify(identities));
 };
 
 const saveEncryptedAppState = async (appState) => {
@@ -66,6 +67,35 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isP2PSyncOpen, setIsP2PSyncOpen] = useState(false);
   const [isSftpOpenMap, setIsSftpOpenMap] = useState({}); // tabId -> boolean
+  const [hostPickerOpen, setHostPickerOpen] = useState(false);
+  const [sftpWidth, setSftpWidth] = useState(340);
+  const sftpResizing = useRef(false);
+  const sftpContainerRef = useRef(null);
+
+  const startSftpResize = useCallback((e) => {
+    e.preventDefault();
+    sftpResizing.current = true;
+    const onMove = (mv) => {
+      if (!sftpResizing.current || !sftpContainerRef.current) return;
+      const containerW = sftpContainerRef.current.offsetWidth;
+      const minW = Math.max(240, containerW * 0.25);
+      const maxW = containerW * 0.5;
+      // drag handle is on LEFT edge of SFTP panel → distance from right
+      const newW = containerW - (mv.clientX - sftpContainerRef.current.getBoundingClientRect().left);
+      setSftpWidth(Math.min(maxW, Math.max(minW, newW)));
+    };
+    const onUp = () => {
+      sftpResizing.current = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, []);
 
   const persistAppState = async (appState) => {
     const nextState = {
@@ -80,6 +110,11 @@ export default function App() {
       await saveEncryptedAppState(nextState);
     } else {
       savePlainAppState(nextState);
+    }
+    
+    // Proactively flush to disk immediately after saving
+    if (typeof window !== 'undefined' && window.electronAPI?.flushStorage) {
+      window.electronAPI.flushStorage().catch(() => {});
     }
   };
 
@@ -118,6 +153,15 @@ export default function App() {
 
     setTabs(prev => [...prev, newTab]);
     setActiveTabId(tabId);
+  };
+
+  const handleDuplicateTab = (tabId) => {
+    const tab = tabs.find(t => t.id === tabId);
+    if (!tab || !tab.connectionProfile) return;
+    const baseName = tab.title.replace(/ \(\d+\)$/, '');
+    const sameNameCount = tabs.filter(t => t.title === baseName || t.title.startsWith(baseName + ' (')).length;
+    const newTitle = `${baseName} (${sameNameCount + 1})`;
+    handleConnectSSH({ ...tab.connectionProfile, _overrideTitle: newTitle });
   };
 
   const handleSelectTab = (tabId) => {
@@ -210,7 +254,7 @@ export default function App() {
 
     const newTab = {
       id: tabId,
-      title: `ssh: ${resolvedProfile.label || resolvedProfile.host}`,
+      title: resolvedProfile._overrideTitle || `ssh: ${resolvedProfile.label || resolvedProfile.host}`,
       type: 'ssh',
       currentPath: `/home/${resolvedProfile.username || 'ubuntu'}`,
       history: initialHistory,
@@ -255,10 +299,15 @@ export default function App() {
   const handleUpdateSettings = (newSettingsFields) => {
     const updated = { ...settings, ...newSettingsFields };
     setSettings(updated);
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(updated));
+    storageService.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(updated));
 
     if (securityService.hasPIN() && securityService.isUnlocked) {
       persistAppState({ settings: updated }).catch(e => console.error('Lỗi đồng bộ mã hóa settings:', e));
+    } else {
+      // Proactively flush if persistAppState wasn't called
+      if (typeof window !== 'undefined' && window.electronAPI?.flushStorage) {
+        window.electronAPI.flushStorage().catch(() => {});
+      }
     }
   };
 
@@ -383,20 +432,20 @@ export default function App() {
     if (importedData.connections) {
       setConnections(importedData.connections);
       if (!securityService.hasPIN()) {
-        localStorage.setItem(STORAGE_KEYS.CONNECTIONS_PLAIN, JSON.stringify(importedData.connections));
+        storageService.setItem(STORAGE_KEYS.CONNECTIONS_PLAIN, JSON.stringify(importedData.connections));
       }
     }
     // 3. Cập nhật Settings
     if (importedData.settings) {
       setSettings(prev => ({ ...prev, ...importedData.settings }));
-      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(importedData.settings));
+      storageService.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(importedData.settings));
     }
     // 4. Cập nhật Keys
     if (importedData.keys) {
       const keysList = Array.isArray(importedData.keys) ? importedData.keys : [];
       setKeys(keysList);
       if (!securityService.hasPIN()) {
-        localStorage.setItem(STORAGE_KEYS.KEYS_PLAIN, JSON.stringify(keysList));
+        storageService.setItem(STORAGE_KEYS.KEYS_PLAIN, JSON.stringify(keysList));
       }
     }
     // 5. Cập nhật Identities
@@ -404,7 +453,7 @@ export default function App() {
       const identitiesList = Array.isArray(importedData.identities) ? importedData.identities : [];
       setIdentities(identitiesList);
       if (!securityService.hasPIN()) {
-        localStorage.setItem(STORAGE_KEYS.IDENTITIES_PLAIN, JSON.stringify(identitiesList));
+        storageService.setItem(STORAGE_KEYS.IDENTITIES_PLAIN, JSON.stringify(identitiesList));
       }
     }
 
@@ -434,10 +483,10 @@ export default function App() {
     // 1. Reset Virtual FS
     virtualFS.reset();
     // 2. Xóa các lưu trữ cục bộ
-    localStorage.removeItem(STORAGE_KEYS.SETTINGS);
-    localStorage.removeItem(STORAGE_KEYS.CONNECTIONS_PLAIN);
-    localStorage.removeItem(STORAGE_KEYS.KEYS_PLAIN);
-    localStorage.removeItem(STORAGE_KEYS.IDENTITIES_PLAIN);
+    storageService.removeItem(STORAGE_KEYS.SETTINGS);
+    storageService.removeItem(STORAGE_KEYS.CONNECTIONS_PLAIN);
+    storageService.removeItem(STORAGE_KEYS.KEYS_PLAIN);
+    storageService.removeItem(STORAGE_KEYS.IDENTITIES_PLAIN);
     // 3. Reset security
     securityService.resetSecurity();
 
@@ -462,6 +511,13 @@ export default function App() {
     console.time('🕒 [4/4] App: Thời gian xử lý Bootstrap (Storage, Crypto, Security)');
     
     const bootstrap = async () => {
+      // Seed localStorage từ file store (Electron) trước khi đọc bất kỳ key nào
+      await storageService.init();
+
+      // Re-init virtualFS sau khi localStorage đã được seed từ file store
+      // (virtualFS được khởi tạo lúc module load, trước khi storageService.init() chạy)
+      virtualFS.init();
+
       // Kiểm tra xem ứng dụng có bị khóa mã PIN không
       const pinEnabled = securityService.hasPIN();
       setIsLocked(pinEnabled);
@@ -475,8 +531,8 @@ export default function App() {
           // Tự động tắt CRT scanlines nếu phát hiện cấu hình cũ chưa được di chuyển
           if (!localStorage.getItem('lastssh_crt_fixed')) {
             parsed.crtEnabled = false;
-            localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(parsed));
-            localStorage.setItem('lastssh_crt_fixed', 'true');
+            storageService.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(parsed));
+            storageService.setItem('lastssh_crt_fixed', 'true');
           }
           
           const normalizeTheme = (themeName) => {
@@ -578,55 +634,60 @@ export default function App() {
           {/* Khung chính bên phải: MainContent */}
           <div className="flex-1 min-h-0 h-full flex flex-col overflow-hidden relative bg-black/5">
 
-            {/* Header: chứa TabsBar quản lý tab và các điều khiển Settings/Sync toàn cục */}
-            <div className="h-12 w-full border-b border-border flex items-center justify-between shrink-0 bg-black/[0.12] theme-light:bg-white/95">
-              <TabsBar
-                tabs={tabs}
-                activeTabId={activeTabId}
-                onSelectTab={handleSelectTab}
-                onCloseTab={handleCloseTab}
-                onRenameTab={handleRenameTab}
-                onReorderTabs={handleReorderTabs}
-                onNewTab={openNewLocalTab}
-              />
-              <div className="flex gap-2 pr-3">
-                {/* Nút toggle SFTP - chỉ hiện khi đang ở tab SSH */}
+            {/* Title bar — kéo dài lên đỉnh window, tab nằm trong vùng traffic lights */}
+            <div
+              className="w-full border-b border-border flex items-center justify-between shrink-0"
+              style={{ WebkitAppRegion: 'drag', height: 36 }}
+            >
+              {/* Khoảng trống cho traffic lights macOS — 80px để tránh đè lên ● ● ● */}
+              <div style={{ width: 80, flexShrink: 0 }} />
+
+              {/* Tabs — vùng trống giữa các tab vẫn drag được window */}
+              <div className="flex-1 min-w-0">
+                <TabsBar
+                  tabs={tabs}
+                  activeTabId={activeTabId}
+                  onSelectTab={handleSelectTab}
+                  onCloseTab={handleCloseTab}
+                  onRenameTab={handleRenameTab}
+                  onReorderTabs={handleReorderTabs}
+                  onNewTab={() => setHostPickerOpen(true)}
+                  onDuplicateTab={handleDuplicateTab}
+                />
+              </div>
+
+              {/* Action buttons bên phải — no-drag */}
+              <div className="flex gap-1.5 pr-3 shrink-0" style={{ WebkitAppRegion: 'no-drag', alignSelf: 'flex-end', marginBottom: 2 }}>
                 {activeTab && activeTab.type === 'ssh' && (
-                  <button 
+                  <button
                     id="btn-toggle-sftp"
-                    className="toolbar-icon-btn" 
                     onClick={() => setIsSftpOpenMap(prev => ({ ...prev, [activeTabId]: !prev[activeTabId] }))}
                     title={isSftpOpen ? 'Ẩn SFTP Explorer' : 'Mở SFTP Explorer'}
-                    style={{ 
-                      background: isSftpOpen ? 'rgba(0,126,255,0.15)' : 'transparent', 
-                      border: isSftpOpen ? '1px solid rgba(0,126,255,0.3)' : '1px solid transparent', 
-                      color: isSftpOpen ? 'var(--termius-accent)' : 'var(--text-muted)', 
-                      cursor: 'pointer', 
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                      width: '32px', height: '32px', borderRadius: '6px',
-                      transition: 'all 0.2s ease'
+                    style={{
+                      background: isSftpOpen ? 'rgba(0,126,255,0.12)' : 'transparent',
+                      border: 'none', color: isSftpOpen ? '#2563eb' : '#9ca3af',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      width: '30px', height: '30px', borderRadius: '8px', transition: 'all 0.15s'
                     }}
                   >
-                    <HardDrive size={16} />
+                    <HardDrive size={15} />
                   </button>
                 )}
-                <button 
+                <button
                   id="btn-p2p"
-                  className="toolbar-icon-btn" 
                   onClick={() => setIsP2PSyncOpen(true)}
                   title="P2P WebRTC Sync"
-                  style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '6px' }}
+                  style={{ background: 'transparent', border: 'none', color: '#9ca3af', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '30px', height: '30px', borderRadius: '8px' }}
                 >
-                  <FolderSync size={16} />
+                  <FolderSync size={15} />
                 </button>
-                <button 
+                <button
                   id="btn-settings"
-                  className="toolbar-icon-btn" 
                   onClick={() => setIsSettingsOpen(true)}
                   title="Preferences"
-                  style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '6px' }}
+                  style={{ background: 'transparent', border: 'none', color: '#9ca3af', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '30px', height: '30px', borderRadius: '8px' }}
                 >
-                  <Settings size={16} />
+                  <Settings size={15} />
                 </button>
               </div>
             </div>
@@ -659,10 +720,11 @@ export default function App() {
                 return (
                   <div
                     key={tab.id}
+                    ref={isActive ? sftpContainerRef : null}
                     className="flex w-full h-full overflow-hidden min-h-0 min-w-0"
                     style={{ display: isActive ? 'flex' : 'none' }}
                   >
-                    <div className="flex-1 min-h-0 min-w-0 h-full overflow-hidden relative transition-all duration-300">
+                    <div className="flex-1 min-h-0 min-w-0 h-full overflow-hidden relative">
                       <TerminalTab
                         tab={tab}
                         settings={settings}
@@ -672,14 +734,28 @@ export default function App() {
                       />
                     </div>
                     {isSftpTabOpen && (
-                      <div className="w-[380px] min-h-0 h-full border-l border-border bg-black/20 backdrop-blur-sm shrink-0 overflow-hidden transition-all duration-300">
-                        <SFTPBrowser
-                          tabId={tab.id}
-                          currentPath={tab.currentPath}
-                          onNavigate={(newPath) => handleUpdateTab(tab.id, { currentPath: newPath })}
-                          onTerminalLog={(msg) => handleSFTPTerminalLog(tab.id, msg)}
+                      <>
+                        {/* Drag handle */}
+                        <div
+                          style={{ width: 4, cursor: 'col-resize', flexShrink: 0, background: 'rgba(0,0,0,0.08)', transition: 'background 0.15s' }}
+                          onMouseDown={startSftpResize}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,115,232,0.4)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.08)'}
+                          title="Drag to resize"
                         />
-                      </div>
+                        {/* SFTP panel */}
+                        <div
+                          className="min-h-0 h-full shrink-0 overflow-hidden border-l border-border"
+                          style={{ width: sftpWidth }}
+                        >
+                          <SFTPBrowser
+                            tabId={tab.id}
+                            currentPath={tab.currentPath}
+                            onNavigate={(newPath) => handleUpdateTab(tab.id, { currentPath: newPath })}
+                            onTerminalLog={(msg) => handleSFTPTerminalLog(tab.id, msg)}
+                          />
+                        </div>
+                      </>
                     )}
                   </div>
                 );
@@ -705,7 +781,63 @@ export default function App() {
         onResetData={handleFactoryResetData}
       />
 
-      {/* 4. Modal đồng bộ dữ liệu P2P WebRTC */}
+      {/* 4. Host Picker — mở khi bấm nút + tab mới */}
+      {hostPickerOpen && (
+        <div
+          className="modal-overlay"
+          onClick={() => setHostPickerOpen(false)}
+        >
+          <div
+            className="modal-content"
+            style={{ maxWidth: 480, maxHeight: '70vh' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <span className="modal-title">Open New Tab</span>
+              <button className="modal-close-btn" onClick={() => setHostPickerOpen(false)}>✕</button>
+            </div>
+            <div className="modal-body" style={{ overflowY: 'auto', padding: '12px 0' }}>
+              {/* Local Terminal */}
+              <button
+                style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '10px 20px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-main)', fontSize: 13, borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+                onClick={() => { openNewLocalTab(); setHostPickerOpen(false); }}
+              >
+                <span style={{ fontSize: 18 }}>💻</span>
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontWeight: 600 }}>Local Terminal</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Local shell on this machine</div>
+                </div>
+              </button>
+              {/* SSH Connections */}
+              {connections.length === 0 && (
+                <div style={{ padding: '24px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
+                  Chưa có host nào. Thêm host từ màn hình Home.
+                </div>
+              )}
+              {connections.map(conn => (
+                <button
+                  key={conn.id}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '10px 20px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-main)', fontSize: 13 }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  onClick={() => { handleConnectSSH(conn); setHostPickerOpen(false); }}
+                >
+                  <span style={{ fontSize: 18 }}>🖥️</span>
+                  <div style={{ textAlign: 'left', flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conn.label}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{conn.username}@{conn.host}:{conn.port || 22}</div>
+                  </div>
+                  {conn.tags?.length > 0 && (
+                    <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(137,180,250,0.12)', color: '#89b4fa' }}>{conn.tags[0]}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Modal đồng bộ dữ liệu P2P WebRTC */}
       <P2PSyncModal
         isOpen={isP2PSyncOpen}
         onClose={() => setIsP2PSyncOpen(false)}

@@ -47,4 +47,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sftpRm: (remotePath, name) => ipcRenderer.invoke('sftp-rm', remotePath, name),
   getKnownHosts: () => ipcRenderer.invoke('ssh-get-known-hosts'),
   forgetHost: (hostPort) => ipcRenderer.invoke('ssh-forget-host', hostPort),
+  flushStorage: () => ipcRenderer.invoke('flush-storage'),
+
+  // File-based persistent store (không phụ thuộc Chromium localStorage flush)
+  store: {
+    getAll: () => ipcRenderer.invoke('store-get-all'),
+    set: (key, value) => ipcRenderer.invoke('store-set', key, value),
+    remove: (key) => ipcRenderer.invoke('store-remove', key),
+    clear: () => ipcRenderer.invoke('store-clear'),
+  },
 });

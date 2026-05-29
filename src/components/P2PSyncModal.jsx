@@ -144,7 +144,7 @@ export default function P2PSyncModal({
         return (
           <div className="p2p-status-indicator">
             <RefreshCw size={14} className="animate-spin" />
-            <span>Đang khởi tạo máy chủ P2P...</span>
+            <span>Đang kết nối đến máy chủ tín hiệu P2P... (tối đa 12s)</span>
           </div>
         );
       case 'connecting':
@@ -207,9 +207,17 @@ export default function P2PSyncModal({
           </div>
 
           {errorMsg && (
-            <div className="text-term-red text-xs flex items-center gap-1.5 justify-center bg-[rgba(255,85,98,0.05)] p-[10px] rounded-lg border border-dashed border-[rgba(255,85,98,0.2)]">
-              <AlertTriangle size={14} />
-              {errorMsg}
+            <div className="flex flex-col items-center gap-2">
+              <div className="text-term-red text-xs flex items-center gap-1.5 justify-center bg-[rgba(255,85,98,0.05)] p-[10px] rounded-lg border border-dashed border-[rgba(255,85,98,0.2)] w-full">
+                <AlertTriangle size={14} />
+                {errorMsg}
+              </div>
+              <button
+                className="glass-button text-xs px-4 py-1.5 flex items-center gap-1.5"
+                onClick={startPeer}
+              >
+                <RefreshCw size={12} /> Thử lại kết nối
+              </button>
             </div>
           )}
 

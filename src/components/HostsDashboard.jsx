@@ -20,6 +20,7 @@ import {
   Upload,
   ExternalLink,
   Laptop,
+  User,
   Settings,
   FolderSync
 } from 'lucide-react';
@@ -401,11 +402,6 @@ export default function HostsDashboard({
   // Known Hosts helpers
   const isDesktop = typeof window !== 'undefined' && !!window.electronAPI?.getKnownHosts;
 
-  useEffect(() => {
-    if (activeSubTab === 'known-hosts') loadKnownHosts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSubTab]);
-
   const loadKnownHosts = async () => {
     if (!isDesktop) return;
     try {
@@ -413,7 +409,7 @@ export default function HostsDashboard({
       setKnownHostsList(
         Object.entries(hosts).map(([hostPort, fingerprint]) => ({ hostPort, fingerprint }))
       );
-    } catch (_e) {}
+    } catch { /* ignore */ }
   };
 
   const handleForgetHost = async (hostPort) => {
@@ -421,7 +417,7 @@ export default function HostsDashboard({
     try {
       await window.electronAPI.forgetHost(hostPort);
       setKnownHostsList(prev => prev.filter(h => h.hostPort !== hostPort));
-    } catch (_e) {}
+    } catch { /* ignore */ }
   };
 
   const getKeyType = (fp) => {
@@ -431,7 +427,7 @@ export default function HostsDashboard({
       if (buf.includes('ssh-ed25519')) return 'ed25519';
       if (buf.includes('ecdsa-sha2')) return 'ecdsa';
       if (buf.includes('ssh-rsa')) return 'rsa';
-    } catch (_e) {}
+    } catch { /* ignore */ }
     return 'ssh';
   };
 
@@ -439,6 +435,14 @@ export default function HostsDashboard({
     if (typeof fp !== 'string' || fp.length < 20) return fp;
     return fp.slice(0, 18) + '…' + fp.slice(-8);
   };
+
+  useEffect(() => {
+    if (activeSubTab === 'known-hosts') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      loadKnownHosts();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSubTab]);
 
   return (
     <div className="hosts-dashboard-wrapper">
@@ -552,12 +556,26 @@ export default function HostsDashboard({
         {/* Toolbar: Các nút thao tác nhanh */}
         <div className="dashboard-toolbar">
           <div className="toolbar-left">
-            <button className="new-host-btn" onClick={handleNewHostClick} id="btn-add-conn">
-              <Plus size={14} /> NEW HOST
-            </button>
-            <button className="serial-btn">
-              <Laptop size={14} /> SERIAL
-            </button>
+            {activeSubTab === 'hosts' && (
+              <>
+                <button className="new-host-btn" onClick={handleNewHostClick} id="btn-add-conn">
+                  <Plus size={14} /> NEW HOST
+                </button>
+                <button className="serial-btn">
+                  <Laptop size={14} /> SERIAL
+                </button>
+              </>
+            )}
+            {activeSubTab === 'keychain' && (
+              <>
+                <button className="new-host-btn" onClick={() => { setShowKeyForm(v => !v); setShowIdentityForm(false); }}>
+                  <Plus size={14} /> NEW KEY
+                </button>
+                <button className="new-host-btn" onClick={() => { setShowIdentityForm(v => !v); setShowKeyForm(false); }}>
+                  <Plus size={14} /> NEW IDENTITY
+                </button>
+              </>
+            )}
           </div>
           <div className="toolbar-right">
             <div className="view-toggle">
@@ -664,9 +682,11 @@ export default function HostsDashboard({
                         <button
                           className="selection-action-btn connect"
                           onClick={() => {
-                            const firstId = [...selectedHostIds][0];
-                            const host = connections.find(c => c.id === firstId);
-                            if (host) onConnectSSH(host);
+                            selectedHostIds.forEach(id => {
+                              const host = connections.find(c => c.id === id);
+                              if (host) onConnectSSH(host);
+                            });
+                            setSelectedHostIds(new Set());
                           }}
                         >
                           Connect
@@ -696,244 +716,154 @@ export default function HostsDashboard({
             </div>
           )}
 
-          {/* TAB 2: KEYCHAIN VIEW */}
+          {/* TAB 2: KEYCHAIN VIEW — Termius style */}
           {activeSubTab === 'keychain' && (
-            <div className="keychain-view-container">
-              <div className="keychain-grid-layout grid grid-cols-2 gap-8">
+            <div className="keychain-view-container" style={{ display: 'flex', flexDirection: 'column', gap: 32, overflowY: 'auto' }}>
 
-                {/* PHẦN 1: KEYS MANAGER */}
-                <div className="keychain-section">
-                  <div className="keychain-header">
-                    <h2>Keys (Private Keys)</h2>
-                    <button
-                      className="add-key-btn"
-                      onClick={() => setShowKeyForm(!showKeyForm)}
-                    >
-                      {showKeyForm ? 'Đóng' : 'Thêm Key'}
-                    </button>
-                  </div>
-
-                  {showKeyForm && (
-                    <form className="keychain-add-form animate-slide-down mb-5" onSubmit={handleAddNewKeySubmit}>
-                      <h3>Thêm Private Key</h3>
-                      <div className="form-group">
-                        <label>Nhãn (Tên gợi nhớ)</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. kien-private.pem"
-                          value={keyLabel}
-                          onChange={(e) => setKeyLabel(e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label className="flex justify-between items-center">
-                          Nội dung Private Key (PEM format)
-                          <button
-                            type="button"
-                            className="file-upload-btn-secondary"
-                            onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                          >
-                            <Upload size={10} className="mr-0.5" /> Chọn file .pem
-                          </button>
-                        </label>
-                        <textarea
-                          placeholder="-----BEGIN RSA PRIVATE KEY-----..."
-                          value={keyContent}
-                          onChange={(e) => setKeyContent(e.target.value)}
-                          rows={4}
-                          required
-                          className="font-mono text-[11px]"
-                        />
-                        <input
-                          type="file"
-                          ref={fileInputRef}
-                          className="hidden"
-                          onChange={handleKeyFileChange}
-                          accept=".pem,.key,.txt,*"
-                        />
-                      </div>
-                      <div className="form-actions-row">
-                        <button type="submit" className="save-btn-primary px-2.5 py-1 text-xs">Lưu khóa</button>
-                        <button type="button" className="cancel-btn-secondary px-2.5 py-1 text-xs" onClick={() => setShowKeyForm(false)}>Hủy</button>
-                      </div>
-                    </form>
-                  )}
-
-                  <div className="keys-list-container">
-                    {(!keys || keys.length === 0) ? (
-                      <div className="empty-state-small p-8 text-center text-[var(--termius-dark-text-muted)]">
-                        <Key size={32} className="mb-2 opacity-50 mx-auto" />
-                        <p className="text-xs">Chưa có khóa private key nào.</p>
-                      </div>
-                    ) : (
-                      <div className="keys-stack flex flex-col gap-2.5">
-                        {keys.map(k => (
-                          <div key={k.id} className="key-card-compact flex items-center justify-between p-3 bg-[var(--termius-dark-card)] rounded-lg border border-white/[0.03]">
-                            <div className="flex items-center gap-2.5">
-                              <div className="key-card-icon-small text-[var(--termius-accent)]">
-                                <Key size={16} />
-                              </div>
-                              <div>
-                                <div className="text-[13px] font-bold text-[var(--termius-dark-text)]">{k.label}</div>
-                                <div className="text-[11px] text-[var(--termius-dark-text-muted)]">Type RSA ({k.keyContent ? k.keyContent.length : 0} B)</div>
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              className="key-delete-btn bg-transparent border-none text-red-500 cursor-pointer"
-                              onClick={() => {
-                                if (window.confirm(`Bạn có chắc chắn muốn xóa khóa "${k.label}"?`)) {
-                                  onDeleteKey(k.id);
-                                }
-                              }}
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+              {/* ── KEYS SECTION ── */}
+              <div>
+                <div style={{ marginBottom: 16 }}>
+                  <h2 style={{ fontSize: 17, fontWeight: 700, color: '#1f2937', margin: 0 }}>Keys</h2>
                 </div>
 
-                {/* PHẦN 2: IDENTITIES MANAGER */}
-                <div className="keychain-section">
-                  <div className="keychain-header">
-                    <h2>Identities (Tài khoản)</h2>
-                    <button
-                      className="add-key-btn"
-                      onClick={() => setShowIdentityForm(!showIdentityForm)}
-                    >
-                      {showIdentityForm ? 'Đóng' : 'Thêm Identity'}
-                    </button>
+                {showKeyForm && (
+                  <form className="keychain-add-form animate-slide-down" style={{ marginBottom: 20 }} onSubmit={handleAddNewKeySubmit}>
+                    <h3>Add Private Key</h3>
+                    <div className="form-group">
+                      <label>Label</label>
+                      <input type="text" placeholder="e.g. my-server-key" value={keyLabel} onChange={(e) => setKeyLabel(e.target.value)} required />
+                    </div>
+                    <div className="form-group">
+                      <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        Private Key (PEM)
+                        <button type="button" className="file-upload-btn-secondary" onClick={() => fileInputRef.current && fileInputRef.current.click()}>
+                          <Upload size={10} style={{ marginRight: 3 }} /> Browse file
+                        </button>
+                      </label>
+                      <textarea placeholder="-----BEGIN RSA PRIVATE KEY-----..." value={keyContent} onChange={(e) => setKeyContent(e.target.value)} rows={4} required className="font-mono text-[11px]" />
+                      <input type="file" ref={fileInputRef} className="hidden" onChange={handleKeyFileChange} accept=".pem,.key,.txt,*" />
+                    </div>
+                    <div className="form-actions-row">
+                      <button type="submit" className="save-btn-primary px-3 py-1.5 text-xs">Save Key</button>
+                      <button type="button" className="cancel-btn-secondary px-3 py-1.5 text-xs" onClick={() => setShowKeyForm(false)}>Cancel</button>
+                    </div>
+                  </form>
+                )}
+
+                {(!keys || keys.length === 0) ? (
+                  <div className="kc-empty-state">
+                    <Key size={36} />
+                    <p>No private keys yet</p>
                   </div>
-
-                  {showIdentityForm && (
-                    <form className="keychain-add-form animate-slide-down mb-5" onSubmit={handleAddIdentitySubmit}>
-                      <h3>Thêm Định danh mới</h3>
-
-                      <div className="form-group">
-                        <label>Nhãn định danh (Tên gợi nhớ)</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. kien'ssh(sen)"
-                          value={identityLabel}
-                          onChange={(e) => setIdentityLabel(e.target.value)}
-                          required
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label>SSH Username</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. kiennt"
-                          value={identityUsername}
-                          onChange={(e) => setIdentityUsername(e.target.value)}
-                          required
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label>Phương thức xác thực</label>
-                        <select
-                          value={identityAuthType}
-                          onChange={(e) => setIdentityAuthType(e.target.value)}
-                          className="key-select-dropdown"
+                ) : (
+                  <div className="kc-card-grid">
+                    {keys.map(k => (
+                      <div key={k.id} className="kc-card group">
+                        <div className="kc-icon kc-icon-key">
+                          <Key size={20} color="#fff" />
+                        </div>
+                        <div className="kc-card-body">
+                          <div className="kc-card-title">{k.label}</div>
+                          <div className="kc-card-sub">Type RSA · {k.keyContent ? k.keyContent.length : 0} B</div>
+                        </div>
+                        <button
+                          className="kc-delete-btn"
+                          onClick={() => { if (window.confirm(`Delete key "${k.label}"?`)) onDeleteKey(k.id); }}
+                          title="Delete"
                         >
-                          <option value="password">Mật khẩu (Password)</option>
-                          <option value="key">Khóa Private Key (Key)</option>
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ── IDENTITIES SECTION ── */}
+              <div>
+                <div style={{ marginBottom: 16 }}>
+                  <h2 style={{ fontSize: 17, fontWeight: 700, color: '#1f2937', margin: 0 }}>Identities</h2>
+                </div>
+
+                {showIdentityForm && (
+                  <form className="keychain-add-form animate-slide-down" style={{ marginBottom: 20 }} onSubmit={handleAddIdentitySubmit}>
+                    <h3>Add Identity</h3>
+                    <div className="form-group">
+                      <label>Label</label>
+                      <input type="text" placeholder="e.g. kien-ssh" value={identityLabel} onChange={(e) => setIdentityLabel(e.target.value)} required />
+                    </div>
+                    <div className="form-group">
+                      <label>SSH Username</label>
+                      <input type="text" placeholder="e.g. ubuntu" value={identityUsername} onChange={(e) => setIdentityUsername(e.target.value)} required />
+                    </div>
+                    <div className="form-group">
+                      <label>Auth method</label>
+                      <select value={identityAuthType} onChange={(e) => setIdentityAuthType(e.target.value)} className="key-select-dropdown">
+                        <option value="password">Password</option>
+                        <option value="key">Private Key</option>
+                      </select>
+                    </div>
+                    {identityAuthType === 'password' ? (
+                      <div className="form-group">
+                        <label>Password</label>
+                        <div className="password-input-wrapper">
+                          <input type={showIdentityPassword ? 'text' : 'password'} placeholder="SSH password..." value={identityPassword} onChange={(e) => setIdentityPassword(e.target.value)} required />
+                          <button type="button" className="password-toggle-btn" onClick={() => setShowIdentityPassword(!showIdentityPassword)}>
+                            {showIdentityPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="form-group">
+                        <label>Linked Private Key</label>
+                        <select value={identityKeyId} onChange={(e) => setIdentityKeyId(e.target.value)} className="key-select-dropdown" required>
+                          <option value="">-- Select Key --</option>
+                          {keys.map(k => <option key={k.id} value={k.id}>{k.label}</option>)}
                         </select>
                       </div>
-
-                      {identityAuthType === 'password' ? (
-                        <div className="form-group">
-                          <label>Mật khẩu</label>
-                          <div className="password-input-wrapper">
-                            <input
-                              type={showIdentityPassword ? 'text' : 'password'}
-                              placeholder="Nhập mật khẩu SSH..."
-                              value={identityPassword}
-                              onChange={(e) => setIdentityPassword(e.target.value)}
-                              required
-                            />
-                            <button
-                              type="button"
-                              className="password-toggle-btn"
-                              onClick={() => setShowIdentityPassword(!showIdentityPassword)}
-                            >
-                              {showIdentityPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="form-group">
-                          <label>Chọn khóa liên kết từ Keychain</label>
-                          <select
-                            value={identityKeyId}
-                            onChange={(e) => setIdentityKeyId(e.target.value)}
-                            className="key-select-dropdown"
-                            required
-                          >
-                            <option value="">-- Chọn Private Key --</option>
-                            {keys.map(k => (
-                              <option key={k.id} value={k.id}>{k.label}</option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-
-                      <div className="form-actions-row">
-                        <button type="submit" className="save-btn-primary px-2.5 py-1 text-xs">Lưu định danh</button>
-                        <button type="button" className="cancel-btn-secondary px-2.5 py-1 text-xs" onClick={() => setShowIdentityForm(false)}>Hủy</button>
-                      </div>
-                    </form>
-                  )}
-
-                  <div className="keys-list-container">
-                    {(!identities || identities.length === 0) ? (
-                      <div className="empty-state-small p-8 text-center text-[var(--termius-dark-text-muted)]">
-                        <Laptop size={32} className="mb-2 opacity-50 mx-auto" />
-                        <p className="text-xs">Chưa có định danh (identity) nào.</p>
-                      </div>
-                    ) : (
-                      <div className="keys-stack flex flex-col gap-2.5">
-                        {identities.map(id => {
-                          const linkedKey = keys.find(k => k.id === id.keyId);
-                          return (
-                            <div key={id.id} className="key-card-compact flex items-center justify-between p-3 bg-[var(--termius-dark-card)] rounded-lg border border-white/[0.03]">
-                              <div className="flex items-center gap-2.5">
-                                <div className="key-card-icon-small text-[var(--termius-accent)]">
-                                  <Laptop size={16} />
-                                </div>
-                                <div>
-                                  <div className="text-[13px] font-bold text-[var(--termius-dark-text)]">{id.label}</div>
-                                  <div className="text-[11px] text-[var(--termius-dark-text-muted)]">
-                                    user: {id.username} | auth: {id.authType === 'key' ? `key (${linkedKey ? linkedKey.label : 'Khóa đã bị xóa'})` : 'password'}
-                                  </div>
-                                </div>
-                              </div>
-                              <button
-                                type="button"
-                                className="key-delete-btn bg-transparent border-none text-red-500 cursor-pointer"
-                                onClick={() => {
-                                  if (window.confirm(`Bạn có chắc chắn muốn xóa định danh "${id.label}"?`)) {
-                                    onDeleteIdentity(id.id);
-                                  }
-                                }}
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
                     )}
-                  </div>
-                </div>
+                    <div className="form-actions-row">
+                      <button type="submit" className="save-btn-primary px-3 py-1.5 text-xs">Save Identity</button>
+                      <button type="button" className="cancel-btn-secondary px-3 py-1.5 text-xs" onClick={() => setShowIdentityForm(false)}>Cancel</button>
+                    </div>
+                  </form>
+                )}
 
+                {(!identities || identities.length === 0) ? (
+                  <div className="kc-empty-state">
+                    <User size={36} />
+                    <p>No identities yet</p>
+                  </div>
+                ) : (
+                  <div className="kc-card-grid">
+                    {identities.map(id => {
+                      const linkedKey = keys.find(k => k.id === id.keyId);
+                      const authLabel = id.authType === 'key'
+                        ? `Auth key${linkedKey ? ` (${linkedKey.label})` : ''}`
+                        : 'Auth password';
+                      return (
+                        <div key={id.id} className="kc-card group">
+                          <div className="kc-icon kc-icon-identity">
+                            <User size={20} color="#fff" />
+                          </div>
+                          <div className="kc-card-body">
+                            <div className="kc-card-title">{id.label}</div>
+                            <div className="kc-card-sub">{id.username} · {authLabel}</div>
+                          </div>
+                          <button
+                            className="kc-delete-btn"
+                            onClick={() => { if (window.confirm(`Delete identity "${id.label}"?`)) onDeleteIdentity(id.id); }}
+                            title="Delete"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
+
             </div>
           )}
 
@@ -1028,7 +958,7 @@ export default function HostsDashboard({
                 {/* Nút bấm nhanh CONNECT & SAVE ở trên đầu để tiện sử dụng */}
                 <button
                   type="button"
-                  className="pane-save-btn-top px-2.5 py-1 text-[11px] bg-white/[0.08] text-[var(--text-main)] border border-white/10 rounded cursor-pointer font-bold"
+                  className="pane-save-btn-top px-2.5 py-1 text-[11px] bg-[rgba(37,99,235,0.2)] text-[#89b4fa] border border-[rgba(37,99,235,0.5)] rounded cursor-pointer font-bold hover:bg-[rgba(37,99,235,0.35)] transition-colors"
                   onClick={handleSaveHost}
                 >
                   Save

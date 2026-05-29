@@ -1,0 +1,22 @@
+--- electron/main.cjs
++++ electron/main.cjs
+@@ -159,6 +159,20 @@
+   }
+ });
+ 
++app.on('before-quit', async () => {
++  try {
++    const { session } = require('electron');
++    if (session.defaultSession) {
++      session.defaultSession.flushStorageData();
++    }
++  } catch(e) {}
++});
++
++// Handle SIGINT/SIGTERM to flush data when killed from terminal
++process.on('SIGINT', () => app.quit());
++process.on('SIGTERM', () => app.quit());
++
+ // --------------------------------------------------------------------------
+ // IPC SSH CONNECTION CHANNELS
+ // --------------------------------------------------------------------------

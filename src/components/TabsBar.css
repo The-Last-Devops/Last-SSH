@@ -1,38 +1,222 @@
 /* ==========================================================================
-   TABSBAR — only styles that cannot be expressed in Tailwind
+   TABSBAR — Chrome-style tab strip
    ========================================================================== */
 
-/* Hide horizontal scrollbar while keeping scroll functionality */
-.tabs-bar-container::-webkit-scrollbar {
-  height: 0px;
+/* ── Strip container ── */
+.chrome-tabstrip {
+  display: flex;
+  align-items: flex-end;   /* tabs sit on the bottom edge */
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 4px;
+  gap: 2px;
+  overflow-x: auto;
+  overflow-y: visible;
 }
 
-/* Light theme overrides — scoped to body.theme-light, not expressible with Tailwind alone */
-body.theme-light .tab-item {
-  background: rgba(0, 0, 0, 0.03);
-  border-color: rgba(0, 0, 0, 0.1);
+.chrome-tabstrip::-webkit-scrollbar { height: 0; }
+
+/* Allow dragging from empty tabstrip space */
+.chrome-tabstrip {
+  -webkit-app-region: drag;
+  app-region: drag;
 }
 
-body.theme-light .tab-item:hover {
-  background: rgba(37, 99, 235, 0.06);
-  border-color: rgba(37, 99, 235, 0.3);
+/* Individual interactive elements must override to no-drag */
+.chrome-tab,
+.chrome-new-tab,
+.chrome-tab__close,
+.chrome-context-menu {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
-body.theme-light .tab-item.active {
-  background: rgba(37, 99, 235, 0.1);
-  border-color: rgba(37, 99, 235, 0.35);
-  border-bottom: 2px solid #2563eb !important;
-  box-shadow: 0 -2px 8px rgba(37, 99, 235, 0.12);
+/* ── Individual tab ── */
+.chrome-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px 0 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  flex: 1;
+  min-width: 100px;
+  max-width: 220px;
+  flex-shrink: 0;
+  user-select: none;
+  transition: background 0.1s;
+  background: transparent;
+
+  /* Tab sits 4px from top, so 4px + 28px = 32px = leaves 4px gap at bottom matching 36px bar */
+  margin-bottom: 2px;
 }
 
-body.theme-light .tab-item.active span {
-  color: #1d4ed8;
+.chrome-tab:hover {
+  background: rgba(0, 0, 0, 0.06);
 }
 
-body.theme-light .tab-item.active svg {
-  color: #2563eb;
+.chrome-tab--active {
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
 }
 
-body.theme-light .tab-item span {
-  color: #4b5563;
+.chrome-tab--active:hover {
+  background: #fff;
+}
+
+.chrome-tab--dragover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+/* ── Tab icon ── */
+.chrome-tab__icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  font-size: 13px;
+  line-height: 1;
+  color: #5f6368;
+}
+
+.chrome-tab--active .chrome-tab__icon {
+  color: #3c4043;
+}
+
+/* ── Tab title ── */
+.chrome-tab__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #5f6368;
+  letter-spacing: -0.01em;
+}
+
+.chrome-tab--active .chrome-tab__title {
+  color: #202124;
+  font-weight: 600;
+}
+
+/* ── Rename input ── */
+.chrome-tab__rename {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+  padding: 1px 4px;
+  outline: none;
+  color: #202124;
+  font-family: inherit;
+}
+
+/* ── Close button ── */
+.chrome-tab__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: #5f6368;
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: background 0.1s, opacity 0.1s;
+  padding: 0;
+}
+
+.chrome-tab:hover .chrome-tab__close,
+.chrome-tab--active .chrome-tab__close {
+  opacity: 1;
+}
+
+.chrome-tab__close:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: #202124;
+}
+
+/* ── New Tab (+) button ── */
+.chrome-new-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: #5f6368;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.1s;
+  margin-bottom: 2px;
+}
+
+.chrome-new-tab:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: #202124;
+}
+
+/* ── Context menu — Termius/Chrome blend ── */
+.chrome-context-menu {
+  position: fixed;
+  z-index: 999;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  min-width: 200px;
+  padding: 5px 0;
+  overflow: hidden;
+}
+
+.chrome-context-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  color: #202124;
+  text-align: left;
+  transition: background 0.08s;
+}
+
+.chrome-context-menu__item:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.chrome-context-menu__item svg {
+  color: #5f6368;
+  flex-shrink: 0;
+}
+
+.chrome-context-menu__item--danger {
+  color: #c5221f;
+}
+
+.chrome-context-menu__item--danger svg {
+  color: #c5221f;
+}
+
+.chrome-context-menu__sep {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.07);
+  margin: 4px 0;
 }

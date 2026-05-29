@@ -104,10 +104,10 @@
 }
 
 .sub-sidebar-item.active {
-  background: var(--termius-dark-sidebar-active);
-  color: var(--termius-accent);
+  background: rgba(96, 165, 250, 0.15);
+  color: #60a5fa;
   font-weight: 600;
-  box-shadow: inset 3px 0 0 var(--termius-accent);
+  box-shadow: inset 3px 0 0 #60a5fa;
 }
 
 .sub-sidebar-item svg {
@@ -115,7 +115,7 @@
 }
 
 .sub-sidebar-item.active svg {
-  color: var(--termius-accent);
+  color: #60a5fa;
 }
 
 .sub-sidebar-bottom {
@@ -509,6 +509,107 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
+  padding: 4px 0;
+}
+
+/* ── Termius-style keychain cards ── */
+.kc-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.kc-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  cursor: default;
+  transition: box-shadow 0.15s, border-color 0.15s;
+  position: relative;
+}
+
+.kc-card:hover {
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.1);
+  border-color: rgba(0, 0, 0, 0.13);
+}
+
+.kc-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.kc-icon-key      { background: #1b3a6b; }
+.kc-icon-identity { background: #1b3a6b; }
+
+.kc-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.kc-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kc-card-sub {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kc-delete-btn {
+  opacity: 0;
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.kc-card:hover .kc-delete-btn { opacity: 1; }
+.kc-delete-btn:hover { background: rgba(239, 68, 68, 0.1); }
+
+.kc-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 0;
+  color: #9ca3af;
+}
+
+.kc-empty-state p {
+  font-size: 13px;
+  margin: 0;
+}
+
+/* Light theme: cards already white, no override needed */
+body.theme-light .kc-card {
+  background: #fff;
+  border-color: rgba(0, 0, 0, 0.08);
 }
 
 .keychain-header {
@@ -983,12 +1084,13 @@ body.theme-light .sub-sidebar-item:hover {
 }
 
 body.theme-light .sub-sidebar-item.active {
-  background: var(--termius-light-sidebar-active);
-  color: var(--termius-accent);
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+  box-shadow: inset 3px 0 0 #2563eb;
 }
 
 body.theme-light .sub-sidebar-item.active svg {
-  color: var(--termius-accent);
+  color: #2563eb;
 }
 
 body.theme-light .sub-sidebar-bottom {
