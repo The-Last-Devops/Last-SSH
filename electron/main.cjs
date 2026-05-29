@@ -55,6 +55,7 @@ function createWindow() {
     height: 800,
     title: 'Last SSH',
     icon: iconPath,
+    backgroundColor: '#16161e',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -62,12 +63,27 @@ function createWindow() {
     }
   });
 
+  mainWindow.once('ready-to-show', () => {
+    if (mainWindow) mainWindow.show();
+  });
+
+  // Fallback: Nếu quá 3 giây mà chưa show thì ép show để không bị ẩn luôn
+  setTimeout(() => {
+    if (mainWindow && !mainWindow.isVisible()) {
+      mainWindow.show();
+    }
+  }, 3000);
+
   // Môi trường phát triển: load Vite dev server
   // Môi trường đóng gói: load file index.html từ dist
   const isDev = !app.isPackaged;
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
-    // mainWindow.webContents.openDevTools(); // Tắt tự động mở console
+    const loadVite = () => {
+      mainWindow.loadURL('http://localhost:5173').catch(() => {
+        setTimeout(loadVite, 200); // Thử lại sau 200ms nếu Vite chưa khởi động xong
+      });
+    };
+    loadVite();
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }

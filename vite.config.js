@@ -6,6 +6,7 @@ import { configDefaults } from 'vitest/config'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: './', // Bắt buộc phải có để build cho Electron (chuyển absolute path -> relative path)
   plugins: [react(), tailwindcss()],
   test: {
     globals: true,

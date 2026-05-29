@@ -1,6 +1,5 @@
 /* Tailwind CSS v4 */
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Source+Code+Pro:wght@400;500;700&display=swap');
 /* Map CSS theme variables → Tailwind utilities */
 @theme inline {
   --color-accent:       var(--accent);

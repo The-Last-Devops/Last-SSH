@@ -6,8 +6,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Last SSH</title>
   </head>
-  <body>
-    <div id="root"></div>
+  <body style="background-color: #1a1b26; margin: 0; padding: 0; color: #a9b1d6; font-family: sans-serif;">
+    <div id="root">
+      <div style="display: flex; height: 100vh; width: 100vw; align-items: center; justify-content: center; flex-direction: column;">
+        <!-- Simple pure CSS spinner -->
+        <style>
+          .spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1); border-radius: 50%; border-top-color: #7aa2f7; animation: spin 1s ease-in-out infinite; }
+          @keyframes spin { to { transform: rotate(360deg); } }
+        </style>
+        <div class="spinner"></div>
+        <div style="margin-top: 16px; font-size: 14px;">Initializing workspace...</div>
+      </div>
+    </div>
+    <script>
+      window.__APP_START_TIME__ = performance.now();
+      console.log('🕒 [1/4] HTML Parser: Bắt đầu tải các module Javascript (Vite)...');
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

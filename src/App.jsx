@@ -458,6 +458,9 @@ export default function App() {
   // BOOTSTRAP INITIALIZATION
   // -------------------------------------------------------------
   useEffect(() => {
+    console.timeEnd('🕒 [3/4] React: Thời gian khởi tạo DOM (createRoot)');
+    console.time('🕒 [4/4] App: Thời gian xử lý Bootstrap (Storage, Crypto, Security)');
+    
     const bootstrap = async () => {
       // Kiểm tra xem ứng dụng có bị khóa mã PIN không
       const pinEnabled = securityService.hasPIN();
@@ -538,6 +541,10 @@ export default function App() {
       // Khởi động ứng dụng với Hosts Dashboard hiển thị, local terminal mở khi người dùng cần.
       setTabs([]);
       setActiveTabId('hosts-dashboard');
+      
+      console.timeEnd('🕒 [4/4] App: Thời gian xử lý Bootstrap (Storage, Crypto, Security)');
+      const totalTime = performance.now() - window.__APP_START_TIME__;
+      console.log(`✅ [HOÀN TẤT] Tổng thời gian khởi động (Từ lúc HTML load xong đến khi sẵn sàng sử dụng): ${totalTime.toFixed(1)}ms`);
     };
     bootstrap();
 
