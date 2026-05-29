@@ -43,10 +43,13 @@ describe('P2P PeerJS WebRTC Sync Service (p2pService)', () => {
     // Chuẩn bị dữ liệu gửi đi
     const mockConnections = [{ id: '1', label: 'Dev Server', host: '192.168.1.100' }];
     const mockSettings = { theme: 'Cyberpunk Neon', fontSize: 16 };
-    const syncPin = '1234';
+    const sessionKey = 'TestEncKey1234';
+
+    // Set session key (bình thường do joiner gửi KEY_EXCHANGE, ở đây mock trực tiếp)
+    p2pService.sessionEncKey = sessionKey;
 
     // Gửi tệp cấu hình mã hóa P2P
-    const sendSuccess = await p2pService.sendPayload(mockConnections, mockSettings, syncPin);
+    const sendSuccess = await p2pService.sendPayload(mockConnections, mockSettings, [], []);
     expect(sendSuccess).toBe(true);
 
     // Chờ nhận dữ liệu
@@ -55,15 +58,15 @@ describe('P2P PeerJS WebRTC Sync Service (p2pService)', () => {
 
     // Lấy gói dữ liệu nhận được trong callback
     const receivedArg = onDataReceivedMock.mock.calls[0][0];
-    expect(receivedArg.hasPinProtection).toBe(true);
     expect(receivedArg.encryptedPayload).toBeTypeOf('string');
+    expect(receivedArg.encKey).toBe(sessionKey);
 
-    // Giải mã gói tin nhận được bằng mã PIN hợp lệ
-    const importData = await p2pService.decryptAndImportPayload(receivedArg.encryptedPayload, syncPin);
+    // Giải mã gói tin nhận được bằng đúng enc key
+    const importData = await p2pService.decryptAndImportPayload(receivedArg.encryptedPayload, sessionKey);
     expect(importData.connections).toEqual(mockConnections);
     expect(importData.settings).toEqual(mockSettings);
 
-    // Đảm bảo sai PIN sẽ giải mã lỗi
-    await expect(p2pService.decryptAndImportPayload(receivedArg.encryptedPayload, '0000')).rejects.toThrow();
+    // Đảm bảo sai key sẽ giải mã lỗi
+    await expect(p2pService.decryptAndImportPayload(receivedArg.encryptedPayload, 'WrongKey9999')).rejects.toThrow();
   });
 });

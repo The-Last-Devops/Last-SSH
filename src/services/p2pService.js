@@ -13,12 +13,24 @@ class P2PService {
     this.mockChannel = null;
     this.targetPeerId = ''; // Lưu trữ đối tác trong chế độ mock
 
+    this.sessionEncKey = ''; // Enc key trao đổi khi ghép đôi
+
     // Callbacks
     this.onIdReady = null;
     this.onConnected = null;
     this.onDataReceived = null;
     this.onError = null;
     this.onDisconnected = null;
+    this.onKeyExchanged = null; // Gọi khi nhận được enc key từ joiner
+  }
+
+  // Tách sync key thành { peerId, encKey }
+  static parseSyncKey(syncKey) {
+    const parts = (syncKey || '').trim().split('::');
+    if (parts.length === 3 && parts[0] === 'LSSH') {
+      return { peerId: parts[1], encKey: parts[2] };
+    }
+    return null;
   }
 
   // Khởi tạo Peer Connection
@@ -256,10 +268,23 @@ class P2PService {
     this.isConnecting = false;
   }
 
-  // Gửi dữ liệu cấu hình đã mã hóa sang peer bên kia
-  async sendPayload(connectionsList = [], settingsState = {}, pin = '', keysList = [], identitiesList = []) {
+  // Gửi KEY_EXCHANGE đến host (joiner gọi khi vừa kết nối)
+  sendKeyExchange(encKey) {
+    const msg = { type: 'KEY_EXCHANGE', encKey };
+    if (this.isMock && this.mockChannel) {
+      this.mockChannel.postMessage({ type: 'DATA_SEND', sender: this.peerId, target: this.targetPeerId, packet: msg });
+    } else if (this.connection) {
+      this.connection.send(msg);
+    }
+  }
+
+  // Gửi dữ liệu — dùng sessionEncKey (trao đổi qua sync key)
+  async sendPayload(connectionsList = [], settingsState = {}, keysList = [], identitiesList = []) {
     if (!this.connection && !this.isMock) {
       throw new Error('Chưa thiết lập kết nối P2P đến thiết bị nào');
+    }
+    if (!this.sessionEncKey) {
+      throw new Error('Chưa có session key. Hãy chờ thiết bị đối tác kết nối.');
     }
 
     try {
@@ -272,60 +297,49 @@ class P2PService {
         sentAt: new Date().toISOString()
       };
 
-      // 2. Mã hóa dữ liệu bằng AES-GCM với mã PIN
-      const encryptionPassword = pin || 'terminus_temp_sync_key';
-      const encryptedString = await securityService.encrypt(JSON.stringify(payload), encryptionPassword);
+      const encryptedString = await securityService.encrypt(JSON.stringify(payload), this.sessionEncKey);
+      const packet = { type: 'TERMINUS_SYNC_PAYLOAD', payload: encryptedString, encKey: this.sessionEncKey };
 
-      const packet = {
-        type: 'TERMINUS_SYNC_PAYLOAD',
-        payload: encryptedString,
-        hasPinProtection: !!pin
-      };
-
-      // 3. Gửi gói tin
       if (this.isMock) {
         if (this.mockChannel) {
-          this.mockChannel.postMessage({
-            type: 'DATA_SEND',
-            sender: this.peerId,
-            target: this.targetPeerId,
-            packet: packet
-          });
+          this.mockChannel.postMessage({ type: 'DATA_SEND', sender: this.peerId, target: this.targetPeerId, packet });
         } else {
-          // Unit test đơn lẻ
-          setTimeout(() => {
-            this.handleReceivedData(packet);
-          }, 50);
+          setTimeout(() => { this.handleReceivedData(packet); }, 50);
         }
       } else {
         this.connection.send(packet);
       }
-
       return true;
     } catch (e) {
-      console.error('Lỗi khi gửi payload P2P:', e);
       throw new Error('Không thể mã hóa hoặc gửi dữ liệu: ' + e.message, { cause: e });
     }
   }
 
   // Xử lý dữ liệu nhận được
   handleReceivedData(data) {
-    if (data && data.type === 'TERMINUS_SYNC_PAYLOAD') {
+    if (!data) return;
+
+    // Joiner gửi enc key sang Host khi kết nối
+    if (data.type === 'KEY_EXCHANGE') {
+      this.sessionEncKey = data.encKey;
+      if (this.onKeyExchanged) this.onKeyExchanged(data.encKey);
+      return;
+    }
+
+    if (data.type === 'TERMINUS_SYNC_PAYLOAD') {
       if (this.onDataReceived) {
-        // Trả ra gói tin mã hóa kèm cờ bảo vệ PIN cho UI xử lý
         this.onDataReceived({
           encryptedPayload: data.payload,
-          hasPinProtection: data.hasPinProtection
+          encKey: data.encKey // enc key đi kèm payload
         });
       }
     }
   }
 
-  // Giải mã và nhập khẩu (Import) dữ liệu đồng bộ nhận được
-  async decryptAndImportPayload(encryptedPayload, password) {
+  // Giải mã và nhập khẩu — encKey tự động từ packet
+  async decryptAndImportPayload(encryptedPayload, encKey) {
     try {
-      // Giải mã dữ liệu
-      const decryptedString = await securityService.decrypt(encryptedPayload, password);
+      const decryptedString = await securityService.decrypt(encryptedPayload, encKey);
       const data = JSON.parse(decryptedString);
 
       if (!data.virtualFS || !Array.isArray(data.connections)) {

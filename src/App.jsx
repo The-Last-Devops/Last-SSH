@@ -6,7 +6,7 @@ import SettingsModal from './components/SettingsModal.jsx';
 import LockScreen from './components/LockScreen.jsx';
 import P2PSyncModal from './components/P2PSyncModal.jsx';
 import HostsDashboard from './components/HostsDashboard.jsx';
-import { Settings, FolderSync, HardDrive } from 'lucide-react';
+import { Settings, HardDrive } from 'lucide-react';
 
 import { securityService } from './services/securityService.js';
 import { virtualFS } from './services/virtualFS.js';
@@ -674,14 +674,6 @@ export default function App() {
                   </button>
                 )}
                 <button
-                  id="btn-p2p"
-                  onClick={() => setIsP2PSyncOpen(true)}
-                  title="P2P WebRTC Sync"
-                  style={{ background: 'transparent', border: 'none', color: '#9ca3af', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '30px', height: '30px', borderRadius: '8px' }}
-                >
-                  <FolderSync size={15} />
-                </button>
-                <button
                   id="btn-settings"
                   onClick={() => setIsSettingsOpen(true)}
                   title="Preferences"
@@ -709,6 +701,8 @@ export default function App() {
                   onDeleteKey={handleDeleteKey}
                   onAddIdentity={handleAddIdentity}
                   onDeleteIdentity={handleDeleteIdentity}
+                  settings={settings}
+                  onSyncComplete={handleImportRestore}
                 />
               )}
 

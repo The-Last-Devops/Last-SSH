@@ -24,6 +24,7 @@ import {
   Settings,
   FolderSync
 } from 'lucide-react';
+import P2PSyncModal from './P2PSyncModal.jsx';
 import './HostsDashboard.css';
 
 // SVG Ubuntu Icon
@@ -51,7 +52,8 @@ export default function HostsDashboard({
   onAddIdentity,
   onDeleteIdentity,
   onOpenSettings,
-  onOpenP2PSync
+  settings = {},
+  onSyncComplete
 }) {
   const [activeSubTab, setActiveSubTab] = useState('hosts');
   const [knownHostsList, setKnownHostsList] = useState([]);
@@ -493,20 +495,19 @@ export default function HostsDashboard({
               <History size={16} />
               <span>Logs</span>
             </button>
+            <button
+              className={`sub-sidebar-item ${activeSubTab === 'sync' ? 'active' : ''}`}
+              onClick={() => { setActiveSubTab('sync'); handleClosePane(); }}
+              id="btn-dashboard-p2p"
+            >
+              <FolderSync size={16} />
+              <span>Sync Data</span>
+            </button>
           </nav>
         </div>
 
-        {/* Sub-sidebar Bottom: Settings & P2P Sync (Chuyển từ sidebar cũ sang) */}
+        {/* Sub-sidebar Bottom: Settings */}
         <div className="sub-sidebar-bottom">
-          <button
-            className="sub-sidebar-item"
-            onClick={onOpenP2PSync}
-            id="btn-dashboard-p2p"
-            title="P2P WebRTC Sync"
-          >
-            <FolderSync size={16} />
-            <span>P2P Sync</span>
-          </button>
           <button
             className="sub-sidebar-item"
             onClick={onOpenSettings}
@@ -942,6 +943,20 @@ export default function HostsDashboard({
               <h2>Logs & History</h2>
               <p>Theo dõi lịch sử kết nối SSH và nhật ký hoạt động mạng chi tiết.</p>
             </div>
+          )}
+
+          {/* TAB: SYNC DATA — inline P2P sync */}
+          {activeSubTab === 'sync' && (
+            <P2PSyncModal
+              isOpen={true}
+              onClose={() => {}}
+              inline={true}
+              connections={connections}
+              settings={settings}
+              keys={keys}
+              identities={identities}
+              onSyncComplete={onSyncComplete}
+            />
           )}
 
         </div>

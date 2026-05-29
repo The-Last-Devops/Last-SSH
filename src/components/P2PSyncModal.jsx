@@ -1,355 +1,414 @@
-import { useState, useEffect } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
-import { 
-  Network, 
-  RefreshCw, 
-  FolderSync, 
-  CheckCircle, 
+import { useState, useEffect, useRef } from 'react';
+import {
+  RefreshCw,
+  FolderSync,
+  CheckCircle,
   AlertTriangle,
   X,
-  Lock
+  Copy,
+  Check,
+  ArrowRight,
+  Upload,
+  Download
 } from 'lucide-react';
 import { p2pService } from '../services/p2pService.js';
 import './P2PSyncModal.css';
 
+// Sinh enc key ngẫu nhiên 12 ký tự alphanumeric
+function genEncKey() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
 export default function P2PSyncModal({
-  isOpen,
-  onClose,
-  connections = [],
-  settings = {},
-  keys = [],
-  identities = [],
-  onSyncComplete
+  isOpen, onClose,
+  connections = [], settings = {}, keys = [], identities = [],
+  onSyncComplete,
+  inline = false  // true = render không có modal overlay (nhúng thẳng vào page)
 }) {
-  const [peerId, setPeerId] = useState('');
-  const [targetPeerId, setTargetPeerId] = useState('');
-  const [status, setStatus] = useState('initializing'); // initializing, idle, connecting, connected, disconnected
-  const [errorMsg, setErrorMsg] = useState('');
-
-  // Gửi và nhận tệp tin
-  const [sentSuccess, setSentSuccess] = useState(false);
+  // step: 'pick' → 'share' | 'receive' → connected
+  const [step, setStep]             = useState('pick');
+  const [peerId, setPeerId]         = useState('');
+  const [encKey, setEncKey]         = useState('');
+  const [timeLeft, setTimeLeft]     = useState(300);
+  const [syncKey, setSyncKey]       = useState('');
+  const [inputKey, setInputKey]     = useState('');
+  const [status, setStatus]         = useState('initializing');
+  const [errorMsg, setErrorMsg]     = useState('');
+  const [copied, setCopied]         = useState(false);
+  const [sentOk, setSentOk]         = useState(false);
   const [receivedData, setReceivedData] = useState(null);
-  
-  // PIN bảo mật cho đồng bộ
-  const [syncPin, setSyncPin] = useState('');
-  const [decryptPin, setDecryptPin] = useState('');
+  const [autoImporting, setAutoImporting] = useState(false);
+  const [isJoiner, setIsJoiner] = useState(false);
 
-  const resetStates = () => {
-    setPeerId('');
-    setTargetPeerId('');
-    setStatus('initializing');
-    setErrorMsg('');
-    setSentSuccess(false);
-    setReceivedData(null);
-    setSyncPin('');
-    setDecryptPin('');
+  const encKeyRef    = useRef(encKey);
+  const peerIdRef    = useRef(peerId);
+  const timerRef     = useRef(null);
+  const isJoinerRef  = useRef(false);
+
+  // Cập nhật ref khi state đổi
+  useEffect(() => { encKeyRef.current = encKey; }, [encKey]);
+  useEffect(() => { peerIdRef.current = peerId; }, [peerId]);
+
+  // Hàm rotate enc key mỗi 30s
+  const rotateKey = () => {
+    const newKey = genEncKey();
+    setEncKey(newKey);
+    encKeyRef.current = newKey;
+    setTimeLeft(300);
+    if (peerIdRef.current) {
+      setSyncKey(`LSSH::${peerIdRef.current}::${newKey}`);
+    }
   };
 
-  // Khởi động PeerJS
+  // Khởi tạo peer
   const startPeer = async () => {
     setStatus('initializing');
     setErrorMsg('');
-    
-    // Cấu hình các callback lắng nghe sự kiện
+    setSentOk(false);
+    setReceivedData(null);
+    isJoinerRef.current = false; setIsJoiner(false);
+
+    const initialKey = genEncKey();
+    setEncKey(initialKey);
+    encKeyRef.current = initialKey;
+    setTimeLeft(300);
+
+    p2pService.sessionEncKey = '';
+
     p2pService.onIdReady = (id) => {
       setPeerId(id);
+      peerIdRef.current = id;
+      setSyncKey(`LSSH::${id}::${initialKey}`);
       setStatus('idle');
     };
 
     p2pService.onConnected = () => {
       setStatus('connected');
+      // Nếu là joiner, gửi enc key sang host ngay
+      if (isJoinerRef.current) {
+        p2pService.sendKeyExchange(encKeyRef.current);
+      }
     };
 
-    p2pService.onDataReceived = (data) => {
-      setReceivedData(data);
+    // Host nhận enc key từ joiner → lưu để dùng khi gửi
+    p2pService.onKeyExchanged = (k) => {
+      p2pService.sessionEncKey = k;
     };
 
-    p2pService.onDisconnected = () => {
-      setStatus('disconnected');
+    p2pService.onDataReceived = async (data) => {
+      // Auto import khi nhận dữ liệu (joiner side)
+      if (data?.encryptedPayload && data?.encKey) {
+        setAutoImporting(true);
+        try {
+          const imported = await p2pService.decryptAndImportPayload(data.encryptedPayload, data.encKey);
+          onSyncComplete(imported);
+          setReceivedData('ok');
+        } catch (err) {
+          setErrorMsg('Giải mã thất bại: ' + err.message);
+        } finally {
+          setAutoImporting(false);
+        }
+      }
     };
 
-    p2pService.onError = (err) => {
-      setErrorMsg(err);
-      setStatus('idle');
-    };
+    p2pService.onDisconnected = () => setStatus('disconnected');
+    p2pService.onError        = (err) => { setErrorMsg(err); setStatus('idle'); };
 
     await p2pService.initPeer();
+
+    // Bắt đầu countdown rotation
+    clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          rotateKey();
+          return 300;
+        }
+        return prev - 1;
+      });
+    }, 1000);
   };
 
   useEffect(() => {
-    const init = async () => {
-      if (isOpen) {
-        await startPeer();
-      } else {
-        p2pService.disconnect();
-        resetStates();
-      }
-    };
-    init();
+    if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      startPeer();
+    } else {
+      clearInterval(timerRef.current);
+      p2pService.disconnect();
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPeerId(''); setEncKey(''); setSyncKey(''); setInputKey('');
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setStatus('initializing'); setErrorMsg(''); setSentOk(false); setReceivedData(null); setStep('pick');
+    }
+    return () => clearInterval(timerRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  // Thiết lập kết nối
-  const handleConnect = async (e) => {
+  // Thiết bị B: kết nối bằng sync key
+  const handleJoin = async (e) => {
     e.preventDefault();
-    if (!targetPeerId.trim()) return;
+    const parsed = p2pService.constructor.parseSyncKey(inputKey.trim());
+    if (!parsed) {
+      setErrorMsg('Sync key không hợp lệ. Định dạng: LSSH::<peerId>::<encKey>');
+      return;
+    }
+    clearInterval(timerRef.current); // dừng rotation khi đã join
+    isJoinerRef.current = true; setIsJoiner(true);
+    // Lưu enc key từ sync key để dùng khi nhận data
+    setEncKey(parsed.encKey);
+    encKeyRef.current = parsed.encKey;
+    p2pService.sessionEncKey = parsed.encKey;
 
     setStatus('connecting');
     setErrorMsg('');
-    
-    const success = await p2pService.connectToPeer(targetPeerId.trim());
-    if (!success) {
-      setStatus('idle');
-    }
+    const ok = await p2pService.connectToPeer(parsed.peerId);
+    if (!ok) setStatus('idle');
   };
 
-  // Gửi dữ liệu mã hóa qua P2P
-  const handleSendData = async () => {
+  // Thiết bị A: gửi dữ liệu (host side)
+  const handleSend = async () => {
     try {
-      setSentSuccess(false);
-      await p2pService.sendPayload(connections, settings, syncPin, keys, identities);
-      setSentSuccess(true);
+      setSentOk(false);
+      await p2pService.sendPayload(connections, settings, keys, identities);
+      setSentOk(true);
     } catch (e) {
-      alert('Không thể gửi dữ liệu: ' + e.message);
+      setErrorMsg('Không thể gửi: ' + e.message);
     }
   };
 
-  // Giải mã và nạp dữ liệu nhận được
-  const handleImportSyncData = async (e) => {
-    e.preventDefault();
-    if (!receivedData) return;
-
-    try {
-      const encryptionPassword = receivedData.hasPinProtection ? decryptPin : 'terminus_temp_sync_key';
-      
-      // Tiến hành giải mã và import virtualFS, connections, settings
-      const imported = await p2pService.decryptAndImportPayload(receivedData.encryptedPayload, encryptionPassword);
-      
-      // Gọi callback để App cập nhật state React
-      onSyncComplete(imported);
-      
-      alert('Đồng bộ hóa dữ liệu thành công! Ứng dụng của bạn đã được cập nhật.');
-      onClose();
-    } catch (err) {
-      console.error(err);
-      alert('Giải mã thất bại! Mã PIN không khớp, vui lòng thử lại.');
-    }
+  const handleCopy = () => {
+    navigator.clipboard.writeText(syncKey).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
   if (!isOpen) return null;
 
-  // Render chu kỳ trạng thái
-  const renderStatus = () => {
-    switch (status) {
-      case 'initializing':
-        return (
-          <div className="p2p-status-indicator">
-            <RefreshCw size={14} className="animate-spin" />
-            <span>Đang kết nối đến máy chủ tín hiệu P2P... (tối đa 12s)</span>
+  const statusColor = {
+    initializing: '#9ca3af',
+    idle:         '#f59e0b',
+    connecting:   '#60a5fa',
+    connected:    '#4ade80',
+    disconnected: '#f87171',
+  }[status] || '#9ca3af';
+
+  const statusLabel = {
+    initializing: 'Connecting to signaling server...',
+    idle:         'Ready to pair',
+    connecting:   'Connecting...',
+    connected:    'Connected!',
+    disconnected: 'Disconnected',
+  }[status] || status;
+
+  const content = (
+    <>
+      <div className="modal-body p2p-flex-layout">
+
+        {/* ── STEP 1: PICK MODE ── */}
+        {step === 'pick' && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, padding: '8px 0' }}>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center' }}>
+              What would you like to do?
+            </p>
+            <div style={{ display: 'flex', gap: 16, width: '100%' }}>
+              <button
+                onClick={() => setStep('share')}
+                style={{
+                  flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+                  padding: '24px 16px', borderRadius: 14, cursor: 'pointer',
+                  background: 'rgba(37,99,235,0.06)', border: '1.5px solid rgba(37,99,235,0.25)',
+                  color: 'var(--text-bright)', transition: 'all 0.15s'
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(37,99,235,0.12)'; e.currentTarget.style.borderColor = 'rgba(37,99,235,0.5)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(37,99,235,0.06)'; e.currentTarget.style.borderColor = 'rgba(37,99,235,0.25)'; }}
+              >
+                <Upload size={32} style={{ color: '#3b82f6' }} />
+                <div style={{ fontWeight: 700, fontSize: 14 }}>Send Data</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>
+                  Generate a key and send your data to another device
+                </div>
+              </button>
+              <button
+                onClick={() => setStep('receive')}
+                style={{
+                  flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+                  padding: '24px 16px', borderRadius: 14, cursor: 'pointer',
+                  background: 'rgba(72,218,147,0.06)', border: '1.5px solid rgba(72,218,147,0.25)',
+                  color: 'var(--text-bright)', transition: 'all 0.15s'
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(72,218,147,0.12)'; e.currentTarget.style.borderColor = 'rgba(72,218,147,0.5)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(72,218,147,0.06)'; e.currentTarget.style.borderColor = 'rgba(72,218,147,0.25)'; }}
+              >
+                <Download size={32} style={{ color: '#4ade80' }} />
+                <div style={{ fontWeight: 700, fontSize: 14 }}>Receive Data</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>
+                  Paste a Sync Key to receive data from another device
+                </div>
+              </button>
+            </div>
           </div>
-        );
-      case 'connecting':
-        return (
-          <div className="p2p-status-indicator">
-            <span className="p2p-status-dot connecting" />
-            <span>Đang kết nối tới đối tác...</span>
+        )}
+
+        {/* ── STEP 2A: SHARE ── */}
+        {step === 'share' && status !== 'connected' && (
+          <div className="p2p-flex-layout">
+            <div className="p2p-status-indicator" style={{ borderColor: statusColor + '44' }}>
+              {status === 'initializing'
+                ? <RefreshCw size={13} className="animate-spin" style={{ color: statusColor }} />
+                : <span style={{ width: 8, height: 8, borderRadius: '50%', background: statusColor, display: 'inline-block' }} />
+              }
+              <span style={{ color: statusColor, fontSize: 12 }}>{statusLabel}</span>
+            </div>
+
+            {errorMsg && (
+              <div className="flex flex-col items-center gap-2">
+                <div className="text-term-red text-xs flex items-center gap-1.5 justify-center bg-[rgba(255,85,98,0.05)] p-2.5 rounded-lg border border-dashed border-[rgba(255,85,98,0.2)] w-full">
+                  <AlertTriangle size={13} /> {errorMsg}
+                </div>
+                <button className="glass-button text-xs px-3 py-1 flex items-center gap-1" onClick={startPeer}>
+                  <RefreshCw size={11} /> Retry
+                </button>
+              </div>
+            )}
+
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+              Share this key with the other device. It refreshes every 5 minutes for security.
+            </p>
+
+            {peerId ? (
+              <div style={{
+                width: '100%', borderRadius: 14, padding: '24px 20px',
+                background: 'rgba(37,99,235,0.06)', border: '1.5px solid rgba(37,99,235,0.2)',
+                textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 12
+              }}>
+                <div style={{ fontSize: 11, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>Sync Key</div>
+                <div style={{ fontFamily: 'monospace', fontSize: 22, fontWeight: 700, letterSpacing: 2, color: 'var(--text-bright)', wordBreak: 'break-all', lineHeight: 1.5 }}>
+                  {syncKey.slice(0, 10)}
+                  <span style={{ color: '#9ca3af', letterSpacing: 1 }}>{'*'.repeat(Math.max(0, syncKey.length - 18))}</span>
+                  {syncKey.slice(-8)}
+                </div>
+                <div style={{ height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 99 }}>
+                  <div style={{ height: '100%', borderRadius: 99, transition: 'width 1s linear, background 1s', background: timeLeft <= 30 ? '#f87171' : '#3b82f6', width: `${(timeLeft / 300) * 100}%` }} />
+                </div>
+                <div style={{ fontSize: 11, color: timeLeft <= 30 ? '#f87171' : '#9ca3af' }}>
+                  Expires in {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', padding: '16px 0' }}>
+                <RefreshCw size={20} className="animate-spin text-text-muted" />
+                <span style={{ fontSize: 12, color: '#6b7280' }}>Initializing...</span>
+              </div>
+            )}
+
+            <button onClick={handleCopy} className="glass-button active w-full flex items-center justify-center gap-2" style={{ height: 42, fontSize: 13, fontWeight: 600 }}>
+              {copied ? <><Check size={15} /> Copied!</> : <><Copy size={15} /> Copy Sync Key</>}
+            </button>
+            <button onClick={() => setStep('pick')} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer' }}>← Back</button>
           </div>
-        );
-      case 'connected':
-        return (
-          <div className="p2p-status-indicator border-[rgba(72,218,147,0.3)]">
-            <span className="p2p-status-dot active" />
-            <span className="text-term-green font-semibold">Đã kết nối P2P thành công!</span>
+        )}
+
+        {/* ── STEP 2B: RECEIVE ── */}
+        {step === 'receive' && status !== 'connected' && (
+          <div className="p2p-flex-layout">
+            <div className="p2p-status-indicator" style={{ borderColor: statusColor + '44' }}>
+              {status === 'initializing' || status === 'connecting'
+                ? <RefreshCw size={13} className="animate-spin" style={{ color: statusColor }} />
+                : <span style={{ width: 8, height: 8, borderRadius: '50%', background: statusColor, display: 'inline-block' }} />
+              }
+              <span style={{ color: statusColor, fontSize: 12 }}>{statusLabel}</span>
+            </div>
+
+            {errorMsg && (
+              <div className="text-term-red text-xs flex items-center gap-1.5 justify-center bg-[rgba(255,85,98,0.05)] p-2.5 rounded-lg border border-dashed border-[rgba(255,85,98,0.2)] w-full">
+                <AlertTriangle size={13} /> {errorMsg}
+              </div>
+            )}
+
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+              Paste the Sync Key copied from the other device.
+            </p>
+
+            <form onSubmit={handleJoin} className="w-full flex flex-col gap-3">
+              <textarea
+                className="glass-input font-mono text-[13px] leading-relaxed"
+                style={{ minHeight: 100, resize: 'none', wordBreak: 'break-all' }}
+                value={inputKey}
+                onChange={e => setInputKey(e.target.value)}
+                placeholder="Paste Sync Key here..."
+                autoFocus
+                required
+              />
+              <button type="submit" className="glass-button active w-full flex items-center justify-center gap-2" style={{ height: 42, fontSize: 13, fontWeight: 600 }} disabled={status === 'connecting'}>
+                {status === 'connecting' ? <><RefreshCw size={14} className="animate-spin" /> Connecting...</> : <><ArrowRight size={14} /> Connect & Sync</>}
+              </button>
+            </form>
+            <button onClick={() => setStep('pick')} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer' }}>← Back</button>
           </div>
-        );
-      case 'disconnected':
-        return (
-          <div className="p2p-status-indicator border-[rgba(255,85,98,0.3)]">
-            <span className="p2p-status-dot bg-[var(--term-red)]" />
-            <span className="text-term-red">Đã ngắt kết nối.</span>
+        )}
+
+        {/* ── CONNECTED ── */}
+        {status === 'connected' && (
+          <div className="p2p-action-center">
+            {!isJoiner && !receivedData && (
+              <>
+                <span className="p2p-action-title">PAIRED — READY TO SEND</span>
+                <p className="text-xs text-text-muted text-center">The other device connected. Click to send all your data.</p>
+                <button className="glass-button active w-full max-w-[320px] flex items-center justify-center gap-2" onClick={handleSend}>
+                  <FolderSync size={14} /> Send Data
+                </button>
+                {sentOk && (
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="text-term-green text-xs flex items-center gap-1.5"><CheckCircle size={13} /> Sent successfully!</div>
+                    <button onClick={() => { setStep('pick'); setSentOk(false); p2pService.disconnect(); setStatus('initializing'); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer' }}>← Back to menu</button>
+                  </div>
+                )}
+              </>
+            )}
+            {isJoiner && receivedData !== 'ok' && (
+              <>
+                <span className="p2p-action-title">WAITING FOR DATA</span>
+                {autoImporting
+                  ? <><RefreshCw size={18} className="animate-spin text-accent" /><p className="text-xs text-text-muted">Importing...</p></>
+                  : <p className="text-xs text-text-muted text-center">Waiting for the other device to send data...</p>
+                }
+              </>
+            )}
+            {receivedData === 'ok' && (
+              <div className="flex flex-col items-center gap-3">
+                <CheckCircle size={36} className="text-term-green" />
+                <span className="text-term-green font-semibold">Sync successful!</span>
+                <p className="text-xs text-text-muted text-center">All data has been applied.</p>
+              </div>
+            )}
           </div>
-        );
-      default:
-        return (
-          <div className="p2p-status-indicator">
-            <span className="p2p-status-dot bg-[var(--term-yellow)]" />
-            <span>Sẵn sàng ghép đôi</span>
-          </div>
-        );
-    }
-  };
+        )}
+
+      </div>
+    </>
+  );
+
+  if (inline) {
+    return <div style={{ padding: '16px 24px', overflowY: 'auto', height: '100%' }}>{content}</div>;
+  }
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content max-w-[640px]">
-        
-        {/* Header */}
+      <div className="modal-content" style={{ maxWidth: 580 }}>
         <div className="modal-header">
           <span className="modal-title flex items-center gap-2">
             <FolderSync size={18} className="text-accent" />
-            P2P DEVICES SYNCHRONIZATION
+            Device Sync (P2P)
           </span>
-          <button className="modal-close-btn" onClick={onClose}>
-            <X size={16} />
-          </button>
+          <button className="modal-close-btn" onClick={onClose}><X size={16} /></button>
         </div>
-
-        {/* Body */}
-        <div className="modal-body p2p-flex-layout">
-          
-          <p className="p2p-description">
-            Đồng bộ hóa dữ liệu trực tiếp ngang hàng (**Peer-to-Peer**) thông qua mạng internet an toàn WebRTC. 
-            Không qua trung gian đám mây, dữ liệu được **mã hóa AES-GCM** cục bộ trước khi truyền.
-          </p>
-
-          {/* Dòng trạng thái kết nối */}
-          <div className="flex justify-center">
-            {renderStatus()}
-          </div>
-
-          {errorMsg && (
-            <div className="flex flex-col items-center gap-2">
-              <div className="text-term-red text-xs flex items-center gap-1.5 justify-center bg-[rgba(255,85,98,0.05)] p-[10px] rounded-lg border border-dashed border-[rgba(255,85,98,0.2)] w-full">
-                <AlertTriangle size={14} />
-                {errorMsg}
-              </div>
-              <button
-                className="glass-button text-xs px-4 py-1.5 flex items-center gap-1.5"
-                onClick={startPeer}
-              >
-                <RefreshCw size={12} /> Thử lại kết nối
-              </button>
-            </div>
-          )}
-
-          {/* CHƯA KẾT NỐI: Hiện mã QR và Form nhập Code */}
-          {status !== 'connected' && status !== 'connecting' && (
-            <div className="p2p-grid">
-              
-              {/* Cột A: Thiết bị phát (Show QR) */}
-              <div className="p2p-card">
-                <span className="p2p-card-title">THIẾT BỊ 1 (QUÉT MÃ QR)</span>
-                {peerId ? (
-                  <>
-                    <div className="p2p-qr-wrapper">
-                      <QRCodeSVG value={peerId} size={130} level="M" />
-                    </div>
-                    <span className="text-[11px] text-text-muted">Mã kết nối của bạn:</span>
-                    <span className="p2p-peer-id-badge">{peerId}</span>
-                  </>
-                ) : (
-                  <RefreshCw size={24} className="animate-spin" />
-                )}
-              </div>
-
-              {/* Cột B: Thiết bị kết nối (Nhập Code) */}
-              <div className="p2p-card">
-                <span className="p2p-card-title">THIẾT BỊ 2 (NHẬP MÃ GHÉP ĐÔI)</span>
-                <form onSubmit={handleConnect} className="w-full flex flex-col gap-[14px]">
-                  <p className="text-[11.5px] text-text-muted text-center">
-                    Nhập mã ghép đôi của thiết bị kia (hoặc dùng điện thoại quét mã QR để điền mã) để kết nối trực tiếp.
-                  </p>
-                  <div className="form-group">
-                    <input 
-                      type="text" 
-                      className="glass-input text-center font-mono tracking-[0.5px]"
-                      value={targetPeerId}
-                      onChange={(e) => setTargetPeerId(e.target.value)}
-                      placeholder="e.g. mock-peer-5678"
-                      required
-                    />
-                  </div>
-                  <button type="submit" className="glass-button active w-full">
-                    <Network size={14} />
-                    Ghép Đôi Thiết Bị
-                  </button>
-                </form>
-              </div>
-
-            </div>
-          )}
-
-          {/* ĐÃ KẾT NỐI: Hiện bảng chuyển dữ liệu */}
-          {status === 'connected' && (
-            <div className="p2p-flex-layout">
-              
-              {/* Hành động Gửi dữ liệu */}
-              <div className="p2p-action-center">
-                <span className="p2p-action-title">GỬI DỮ LIỆU ĐẾN THIẾT BỊ ĐỐI TÁC</span>
-                <div className="flex flex-col gap-[10px] w-full max-w-[380px]">
-                  <div className="form-group">
-                    <label className="form-label text-center">Mật mã PIN Bảo mật gói dữ liệu (Tùy chọn)</label>
-                    <input
-                      type="password"
-                      className="glass-input text-center"
-                      value={syncPin}
-                      maxLength="6"
-                      onChange={(e) => setSyncPin(e.target.value.replace(/\D/g, ''))}
-                      placeholder="Thiết lập PIN 4-6 số để bên nhận giải mã"
-                    />
-                  </div>
-                  <button className="glass-button active w-full" onClick={handleSendData}>
-                    <FolderSync size={14} />
-                    Mã hóa & Gửi toàn bộ cấu hình
-                  </button>
-                </div>
-                {sentSuccess && (
-                  <div className="text-term-green text-xs flex items-center gap-1.5">
-                    <CheckCircle size={14} />
-                    Đã gửi dữ liệu mã hóa thành công sang thiết bị bên kia!
-                  </div>
-                )}
-              </div>
-
-              {/* Lắng nghe Nhận dữ liệu */}
-              {receivedData && (
-                <form onSubmit={handleImportSyncData} className="p2p-action-center border border-[var(--term-yellow)] bg-[rgba(241,196,15,0.05)]">
-                  <span className="p2p-action-title text-[var(--term-yellow)]">NHẬN DỮ LIỆU ĐỒNG BỘ MỚI</span>
-                  <p className="text-xs text-text-main text-center">
-                    Thiết bị đối tác vừa gửi cho bạn một gói cấu hình Last SSH!
-                  </p>
-                  
-                  {receivedData.hasPinProtection ? (
-                    <div className="flex flex-col gap-[10px] w-full max-w-[380px]">
-                      <div className="form-group">
-                        <label className="form-label text-center">Gói tin có mã khóa. Nhập PIN giải mã của Thiết bị Gửi:</label>
-                        <input
-                          type="password"
-                          className="glass-input text-center"
-                          value={decryptPin}
-                          maxLength="6"
-                          onChange={(e) => setDecryptPin(e.target.value.replace(/\D/g, ''))}
-                          placeholder="Nhập PIN giải mã"
-                          required
-                        />
-                      </div>
-                      <button type="submit" className="glass-button active w-full bg-[rgba(241,196,15,0.2)] border-[var(--term-yellow)] text-[var(--term-yellow)]">
-                        <Lock size={14} />
-                        Giải mã & Áp dụng ngay
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-[10px] w-full max-w-[380px]">
-                      <p className="text-[11px] text-text-muted text-center">Gói tin không có mật khẩu bảo vệ.</p>
-                      <button type="submit" className="glass-button active w-full">
-                        Nhập khẩu cấu hình ngay
-                      </button>
-                    </div>
-                  )}
-                </form>
-              )}
-
-            </div>
-          )}
-
-        </div>
-
-        {/* Footer */}
+        {content}
         <div className="modal-footer">
-          <button className="glass-button" onClick={onClose}>
-            Close
-          </button>
+          <button className="glass-button" onClick={onClose}>Close</button>
         </div>
-
       </div>
     </div>
   );
