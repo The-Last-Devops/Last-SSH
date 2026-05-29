@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="build/icon.png" alt="Last SSH" width="120" />
+</div>
+
 # Last SSH
 
 A modern Desktop application for managing SSH and SFTP servers, built with Electron, ReactJS, and Vite. The application allows you to easily manage connection information, security keys, synchronize data across devices, and utilize a stylish integrated Terminal.
