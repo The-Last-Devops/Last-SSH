@@ -124,6 +124,23 @@
   z-index: 10;
 }
 
+/* Xterm.js real terminal container */
+.xterm-terminal-container {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.xterm-terminal-container .xterm {
+  height: 100%;
+  padding: 8px;
+}
+
+.xterm-terminal-container .xterm-screen {
+  height: 100%;
+}
+
 /* Enable text selection inside terminal */
 .terminal-container,
 .terminal-container *,

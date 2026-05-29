@@ -17,6 +17,8 @@ export default function P2PSyncModal({
   onClose,
   connections = [],
   settings = {},
+  keys = [],
+  identities = [],
   onSyncComplete
 }) {
   const [peerId, setPeerId] = useState('');
@@ -104,8 +106,7 @@ export default function P2PSyncModal({
   const handleSendData = async () => {
     try {
       setSentSuccess(false);
-      // Gửi toàn bộ Virtual FS, connections và settings đã mã hóa bằng syncPin
-      await p2pService.sendPayload(connections, settings, syncPin);
+      await p2pService.sendPayload(connections, settings, syncPin, keys, identities);
       setSentSuccess(true);
     } catch (e) {
       alert('Không thể gửi dữ liệu: ' + e.message);
@@ -155,22 +156,22 @@ export default function P2PSyncModal({
         );
       case 'connected':
         return (
-          <div className="p2p-status-indicator" style={{ borderColor: 'rgba(72, 218, 147, 0.3)' }}>
+          <div className="p2p-status-indicator border-[rgba(72,218,147,0.3)]">
             <span className="p2p-status-dot active" />
-            <span style={{ color: 'var(--term-green)', fontWeight: 600 }}>Đã kết nối P2P thành công!</span>
+            <span className="text-term-green font-semibold">Đã kết nối P2P thành công!</span>
           </div>
         );
       case 'disconnected':
         return (
-          <div className="p2p-status-indicator" style={{ borderColor: 'rgba(255, 85, 98, 0.3)' }}>
-            <span className="p2p-status-dot" style={{ backgroundColor: 'var(--term-red)' }} />
-            <span style={{ color: 'var(--term-red)' }}>Đã ngắt kết nối.</span>
+          <div className="p2p-status-indicator border-[rgba(255,85,98,0.3)]">
+            <span className="p2p-status-dot bg-[var(--term-red)]" />
+            <span className="text-term-red">Đã ngắt kết nối.</span>
           </div>
         );
       default:
         return (
           <div className="p2p-status-indicator">
-            <span className="p2p-status-dot" style={{ backgroundColor: 'var(--term-yellow)' }} />
+            <span className="p2p-status-dot bg-[var(--term-yellow)]" />
             <span>Sẵn sàng ghép đôi</span>
           </div>
         );
@@ -179,12 +180,12 @@ export default function P2PSyncModal({
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content" style={{ maxWidth: '640px' }}>
+      <div className="modal-content max-w-[640px]">
         
         {/* Header */}
         <div className="modal-header">
-          <span className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <FolderSync size={18} style={{ color: 'var(--accent)' }} />
+          <span className="modal-title flex items-center gap-2">
+            <FolderSync size={18} className="text-accent" />
             P2P DEVICES SYNCHRONIZATION
           </span>
           <button className="modal-close-btn" onClick={onClose}>
@@ -201,12 +202,12 @@ export default function P2PSyncModal({
           </p>
 
           {/* Dòng trạng thái kết nối */}
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <div className="flex justify-center">
             {renderStatus()}
           </div>
 
           {errorMsg && (
-            <div style={{ color: 'var(--term-red)', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', background: 'rgba(255, 85, 98, 0.05)', padding: '10px', borderRadius: '8px', border: '1px dashed rgba(255, 85, 98, 0.2)' }}>
+            <div className="text-term-red text-xs flex items-center gap-1.5 justify-center bg-[rgba(255,85,98,0.05)] p-[10px] rounded-lg border border-dashed border-[rgba(255,85,98,0.2)]">
               <AlertTriangle size={14} />
               {errorMsg}
             </div>
@@ -224,7 +225,7 @@ export default function P2PSyncModal({
                     <div className="p2p-qr-wrapper">
                       <QRCodeSVG value={peerId} size={130} level="M" />
                     </div>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Mã kết nối của bạn:</span>
+                    <span className="text-[11px] text-text-muted">Mã kết nối của bạn:</span>
                     <span className="p2p-peer-id-badge">{peerId}</span>
                   </>
                 ) : (
@@ -235,22 +236,21 @@ export default function P2PSyncModal({
               {/* Cột B: Thiết bị kết nối (Nhập Code) */}
               <div className="p2p-card">
                 <span className="p2p-card-title">THIẾT BỊ 2 (NHẬP MÃ GHÉP ĐÔI)</span>
-                <form onSubmit={handleConnect} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                <form onSubmit={handleConnect} className="w-full flex flex-col gap-[14px]">
+                  <p className="text-[11.5px] text-text-muted text-center">
                     Nhập mã ghép đôi của thiết bị kia (hoặc dùng điện thoại quét mã QR để điền mã) để kết nối trực tiếp.
                   </p>
                   <div className="form-group">
                     <input 
                       type="text" 
-                      className="glass-input" 
-                      style={{ textAlign: 'center', fontFamily: 'Fira Code, monospace', letterSpacing: '0.5px' }}
+                      className="glass-input text-center font-mono tracking-[0.5px]"
                       value={targetPeerId}
                       onChange={(e) => setTargetPeerId(e.target.value)}
                       placeholder="e.g. mock-peer-5678"
                       required
                     />
                   </div>
-                  <button type="submit" className="glass-button active" style={{ width: '100%' }}>
+                  <button type="submit" className="glass-button active w-full">
                     <Network size={14} />
                     Ghép Đôi Thiết Bị
                   </button>
@@ -267,26 +267,25 @@ export default function P2PSyncModal({
               {/* Hành động Gửi dữ liệu */}
               <div className="p2p-action-center">
                 <span className="p2p-action-title">GỬI DỮ LIỆU ĐẾN THIẾT BỊ ĐỐI TÁC</span>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', maxWidth: '380px' }}>
+                <div className="flex flex-col gap-[10px] w-full max-w-[380px]">
                   <div className="form-group">
-                    <label className="form-label" style={{ textAlign: 'center' }}>Mật mã PIN Bảo mật gói dữ liệu (Tùy chọn)</label>
-                    <input 
-                      type="password" 
-                      className="glass-input"
-                      style={{ textAlign: 'center' }}
+                    <label className="form-label text-center">Mật mã PIN Bảo mật gói dữ liệu (Tùy chọn)</label>
+                    <input
+                      type="password"
+                      className="glass-input text-center"
                       value={syncPin}
                       maxLength="6"
                       onChange={(e) => setSyncPin(e.target.value.replace(/\D/g, ''))}
                       placeholder="Thiết lập PIN 4-6 số để bên nhận giải mã"
                     />
                   </div>
-                  <button className="glass-button active" onClick={handleSendData} style={{ width: '100%' }}>
+                  <button className="glass-button active w-full" onClick={handleSendData}>
                     <FolderSync size={14} />
                     Mã hóa & Gửi toàn bộ cấu hình
                   </button>
                 </div>
                 {sentSuccess && (
-                  <div style={{ color: 'var(--term-green)', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div className="text-term-green text-xs flex items-center gap-1.5">
                     <CheckCircle size={14} />
                     Đã gửi dữ liệu mã hóa thành công sang thiết bị bên kia!
                   </div>
@@ -295,20 +294,19 @@ export default function P2PSyncModal({
 
               {/* Lắng nghe Nhận dữ liệu */}
               {receivedData && (
-                <form onSubmit={handleImportSyncData} className="p2p-action-center" style={{ border: '1px solid var(--term-yellow)', background: 'rgba(241, 196, 15, 0.05)' }}>
-                  <span className="p2p-action-title" style={{ color: 'var(--term-yellow)' }}>NHẬN DỮ LIỆU ĐỒNG BỘ MỚI</span>
-                  <p style={{ fontSize: '12px', color: 'var(--text-main)', textAlign: 'center' }}>
+                <form onSubmit={handleImportSyncData} className="p2p-action-center border border-[var(--term-yellow)] bg-[rgba(241,196,15,0.05)]">
+                  <span className="p2p-action-title text-[var(--term-yellow)]">NHẬN DỮ LIỆU ĐỒNG BỘ MỚI</span>
+                  <p className="text-xs text-text-main text-center">
                     Thiết bị đối tác vừa gửi cho bạn một gói cấu hình Last SSH!
                   </p>
                   
                   {receivedData.hasPinProtection ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', maxWidth: '380px' }}>
+                    <div className="flex flex-col gap-[10px] w-full max-w-[380px]">
                       <div className="form-group">
-                        <label className="form-label" style={{ textAlign: 'center' }}>Gói tin có mã khóa. Nhập PIN giải mã của Thiết bị Gửi:</label>
-                        <input 
-                          type="password" 
-                          className="glass-input"
-                          style={{ textAlign: 'center' }}
+                        <label className="form-label text-center">Gói tin có mã khóa. Nhập PIN giải mã của Thiết bị Gửi:</label>
+                        <input
+                          type="password"
+                          className="glass-input text-center"
                           value={decryptPin}
                           maxLength="6"
                           onChange={(e) => setDecryptPin(e.target.value.replace(/\D/g, ''))}
@@ -316,15 +314,15 @@ export default function P2PSyncModal({
                           required
                         />
                       </div>
-                      <button type="submit" className="glass-button active" style={{ width: '100%', background: 'rgba(241, 196, 15, 0.2)', borderColor: 'var(--term-yellow)', color: 'var(--term-yellow)' }}>
+                      <button type="submit" className="glass-button active w-full bg-[rgba(241,196,15,0.2)] border-[var(--term-yellow)] text-[var(--term-yellow)]">
                         <Lock size={14} />
                         Giải mã & Áp dụng ngay
                       </button>
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', maxWidth: '380px' }}>
-                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>Gói tin không có mật khẩu bảo vệ.</p>
-                      <button type="submit" className="glass-button active" style={{ width: '100%' }}>
+                    <div className="flex flex-col gap-[10px] w-full max-w-[380px]">
+                      <p className="text-[11px] text-text-muted text-center">Gói tin không có mật khẩu bảo vệ.</p>
+                      <button type="submit" className="glass-button active w-full">
                         Nhập khẩu cấu hình ngay
                       </button>
                     </div>

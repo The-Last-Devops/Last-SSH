@@ -296,3 +296,44 @@ input:checked + .switch-slider:before {
   color: var(--text-muted);
 }
 
+/* ==========================================================================
+   LIGHT THEME OVERRIDES FOR SETTINGS MODAL
+   ========================================================================== */
+
+body.theme-light .key-setup-form {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+body.theme-light .key-textarea {
+  background: #ffffff !important;
+  color: #1d1d1f;
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+body.theme-light .settings-toggle-row {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+body.theme-light .settings-section {
+  color: #1d1d1f;
+}
+
+body.theme-light .key-item {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+body.theme-light .key-item:hover {
+  background: rgba(37, 99, 235, 0.06);
+  border-color: rgba(37, 99, 235, 0.25);
+}
+
+body.theme-light .key-item-label {
+  color: #1d1d1f;
+}
+
+body.theme-light .key-item-meta {
+  color: #6b7280;
+}

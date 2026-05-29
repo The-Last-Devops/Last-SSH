@@ -3,34 +3,34 @@
    ========================================================================== */
 
 :root {
-  /* Termius Dark Theme Colors */
-  --termius-dark-bg: #1a1e29;
-  --termius-dark-sidebar: #11141c;
-  --termius-dark-sidebar-active: #1c222e;
-  --termius-dark-card: #222836;
-  --termius-dark-card-hover: #2b3244;
-  --termius-dark-pane: #1e2433;
-  --termius-dark-border: rgba(255, 255, 255, 0.08);
-  --termius-dark-text: #e1e6eb;
-  --termius-dark-text-muted: #7f8c9d;
-  --termius-dark-text-bright: #ffffff;
-  
-  /* Termius Light Theme Colors */
-  --termius-light-bg: #f4f6f8;
-  --termius-light-sidebar: #e9ebf0;
-  --termius-light-sidebar-active: #dbe0eb;
+  /* Termius Dark (Tokyo Night) */
+  --termius-dark-bg: #1a1b26;
+  --termius-dark-sidebar: #16161e;
+  --termius-dark-sidebar-active: rgba(122, 162, 247, 0.12);
+  --termius-dark-card: #1f2335;
+  --termius-dark-card-hover: #24283b;
+  --termius-dark-pane: #1f2335;
+  --termius-dark-border: rgba(255, 255, 255, 0.07);
+  --termius-dark-text: #c0caf5;
+  --termius-dark-text-muted: #565f89;
+  --termius-dark-text-bright: #e0e0f0;
+
+  /* Termius Light (Termius-style) */
+  --termius-light-bg: #f5f5f7;
+  --termius-light-sidebar: #ffffff;
+  --termius-light-sidebar-active: rgba(37, 99, 235, 0.07);
   --termius-light-card: #ffffff;
   --termius-light-card-hover: #f9fafb;
   --termius-light-pane: #ffffff;
   --termius-light-border: rgba(0, 0, 0, 0.08);
-  --termius-light-text: #2c3e50;
-  --termius-light-text-muted: #748a9e;
-  --termius-light-text-bright: #1a252f;
-  
-  /* Common Termius Colors */
-  --termius-accent: #007eff;
-  --termius-accent-glow: rgba(0, 126, 255, 0.25);
-  --termius-ubuntu: #E95420;
+  --termius-light-text: #1d1d1f;
+  --termius-light-text-muted: #6b7280;
+  --termius-light-text-bright: #000000;
+
+  /* Common */
+  --termius-accent: #2563eb;
+  --termius-accent-glow: rgba(37, 99, 235, 0.15);
+  --termius-ubuntu: #e95420;
 }
 
 .hosts-dashboard-wrapper {
@@ -42,6 +42,10 @@
   overflow: hidden;
 }
 
+/* --------------------------------------------------------------------------
+   CỘT 1: LEFT SUB-SIDEBAR
+   -------------------------------------------------------------------------- */
+
 .dashboard-sub-sidebar {
   width: 220px;
   background: var(--termius-dark-sidebar);
@@ -50,17 +54,12 @@
   flex-direction: column;
   padding: 16px 8px;
   flex-shrink: 0;
-  justify-content: space-between; /* Đẩy menu xuống dưới */
+  justify-content: space-between;
   position: sticky;
   top: 0;
   align-self: stretch;
   min-height: 100vh;
-  transition: none;
 }
-
-/* --------------------------------------------------------------------------
-   CỘT 1: LEFT SUB-SIDEBAR
-   -------------------------------------------------------------------------- */
 
 .sub-sidebar-top {
   display: flex;
@@ -97,7 +96,6 @@
   font-weight: 500;
   text-align: left;
   cursor: pointer;
-  transition: none;
 }
 
 .sub-sidebar-item:hover {
@@ -114,14 +112,12 @@
 
 .sub-sidebar-item svg {
   color: var(--termius-dark-text-muted);
-  transition: color 0.2s;
 }
 
 .sub-sidebar-item.active svg {
   color: var(--termius-accent);
 }
 
-/* Sub-sidebar Bottom (Settings & P2P Sync) */
 .sub-sidebar-bottom {
   display: flex;
   flex-direction: column;
@@ -143,7 +139,6 @@
   position: relative;
 }
 
-/* Topbar: Live Search & Connect */
 .dashboard-topbar {
   margin-bottom: 20px;
 }
@@ -212,7 +207,6 @@
   cursor: not-allowed;
 }
 
-/* Toolbar: Action buttons */
 .dashboard-toolbar {
   display: flex;
   justify-content: space-between;
@@ -640,55 +634,6 @@
   cursor: pointer;
 }
 
-.keys-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 12px;
-}
-
-.key-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: var(--termius-dark-card);
-  border: 1px solid var(--termius-dark-border);
-  border-radius: 8px;
-  padding: 12px 14px;
-  transition: all 0.2s;
-}
-
-.key-card:hover {
-  border-color: rgba(255, 255, 255, 0.15);
-  background: var(--termius-dark-card-hover);
-}
-
-.key-card-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 6px;
-  background: rgba(0, 126, 255, 0.1);
-  color: var(--termius-accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.key-card-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--termius-dark-text-bright);
-  margin-bottom: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.key-card-summary {
-  font-size: 11px;
-  color: var(--termius-dark-text-muted);
-}
-
 .key-delete-btn {
   background: transparent;
   border: none;
@@ -720,7 +665,7 @@
 }
 
 .simulated-icon {
-  opacity: 0.2;
+  opacity: 0.45;
   margin-bottom: 20px;
   color: var(--termius-accent);
 }
@@ -760,7 +705,7 @@
 }
 
 /* --------------------------------------------------------------------------
-   CỘT 3: RIGHT HOST DETAILS PANE (Sliding panel)
+   CỘT 3: RIGHT HOST DETAILS PANE
    -------------------------------------------------------------------------- */
 .dashboard-details-pane {
   position: absolute;
@@ -777,16 +722,13 @@
   overflow: hidden;
 }
 
-.dashboard-details-pane.open {
-  /* No animation needed */
-}
-
 .pane-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .pane-header h3 {
@@ -844,12 +786,14 @@
 }
 
 .section-title {
-  font-size: 12px;
+  font-size: 10.5px;
   font-weight: 700;
   text-transform: uppercase;
-  color: var(--termius-dark-text-muted);
-  letter-spacing: 0.5px;
-  margin-bottom: 4px;
+  color: var(--termius-accent);
+  letter-spacing: 0.8px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .password-input-wrapper {
@@ -943,10 +887,12 @@
 
 .pane-actions-footer {
   margin-top: auto;
-  padding-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 16px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.15);
   display: flex;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .pane-delete-btn {
@@ -971,9 +917,9 @@
 .pane-save-btn {
   flex-grow: 1;
   height: 42px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--termius-dark-border);
-  color: var(--termius-dark-text-bright);
+  background: rgba(37, 99, 235, 0.15);
+  border: 1px solid rgba(37, 99, 235, 0.45);
+  color: #89b4fa;
   font-weight: 600;
   font-size: 13px;
   border-radius: 8px;
@@ -982,8 +928,9 @@
 }
 
 .pane-save-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(37, 99, 235, 0.3);
+  border-color: #89b4fa;
+  color: #ffffff;
 }
 
 .pane-connect-btn {
@@ -1009,7 +956,7 @@
 }
 
 /* --------------------------------------------------------------------------
-   THEME-LIGHT SPECIFIC CUSTOMIZATIONS (Giao diện sáng sắc nét tương phản cao)
+   THEME-LIGHT SPECIFIC CUSTOMIZATIONS
    -------------------------------------------------------------------------- */
 body.theme-light .hosts-dashboard-wrapper {
   background: var(--termius-light-bg);
@@ -1133,16 +1080,16 @@ body.theme-light .form-group label {
   color: var(--termius-light-text-muted);
 }
 
-body.theme-light .form-group input, 
-body.theme-light .form-group textarea, 
+body.theme-light .form-group input,
+body.theme-light .form-group textarea,
 body.theme-light .form-group select {
   background: #ffffff;
   border-color: var(--termius-light-border);
   color: var(--termius-light-text-bright);
 }
 
-body.theme-light .form-group input:focus, 
-body.theme-light .form-group textarea:focus, 
+body.theme-light .form-group input:focus,
+body.theme-light .form-group textarea:focus,
 body.theme-light .form-group select:focus {
   border-color: var(--termius-accent);
 }
@@ -1153,23 +1100,15 @@ body.theme-light .cancel-btn-secondary {
   color: var(--termius-light-text-bright);
 }
 
-body.theme-light .key-card {
-  background: var(--termius-light-card);
-  border-color: var(--termius-light-border);
-}
-
-body.theme-light .key-card-label {
-  color: var(--termius-light-text-bright);
-}
-
-body.theme-light .key-card-summary {
-  color: var(--termius-light-text-muted);
-}
-
 body.theme-light .dashboard-details-pane {
   background: var(--termius-light-pane);
   border-left-color: var(--termius-light-border);
   box-shadow: -8px 0 20px rgba(0, 0, 0, 0.08);
+}
+
+body.theme-light .pane-header {
+  background: #f9fafb;
+  border-bottom-color: rgba(0, 0, 0, 0.08);
 }
 
 body.theme-light .pane-header h3 {
@@ -1177,7 +1116,17 @@ body.theme-light .pane-header h3 {
 }
 
 body.theme-light .section-title {
-  color: var(--termius-light-text-muted);
+  color: var(--termius-accent);
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+body.theme-light .pane-actions-footer {
+  background: #f9fafb;
+  border-top-color: rgba(0, 0, 0, 0.08);
+}
+
+body.theme-light .pane-section.border-top {
+  border-top-color: rgba(0, 0, 0, 0.08);
 }
 
 body.theme-light .advanced-sim-item {
@@ -1199,12 +1148,337 @@ body.theme-light .sim-status.disabled {
 }
 
 body.theme-light .pane-save-btn {
-  background: #ffffff;
-  border-color: var(--termius-light-border);
-  color: var(--termius-light-text-bright);
+  background: #eff6ff;
+  border-color: #2563eb;
+  color: #2563eb;
 }
 
 body.theme-light .pane-save-btn:hover {
-  background: #f1f2f6;
-  border-color: #a4b0be;
+  background: #2563eb;
+  border-color: #1d4ed8;
+  color: #ffffff;
+}
+
+/* ==========================================================================
+   KNOWN HOSTS PAGE
+   ========================================================================== */
+
+.known-hosts-container {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.known-hosts-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--termius-dark-border);
+}
+
+.known-hosts-header svg {
+  color: var(--termius-accent);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.known-hosts-header h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--termius-dark-text-bright);
+}
+
+.known-hosts-header p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--termius-dark-text-muted);
+  line-height: 1.5;
+}
+
+.known-hosts-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+  gap: 12px;
+  color: var(--termius-dark-text-muted);
+}
+
+.known-hosts-empty svg {
+  opacity: 0.4;
+  color: var(--termius-accent);
+  margin-bottom: 8px;
+}
+
+.known-hosts-empty p {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--termius-dark-text);
+  margin: 0;
+}
+
+.known-hosts-empty small {
+  font-size: 12px;
+  color: var(--termius-dark-text-muted);
+  max-width: 320px;
+  line-height: 1.5;
+}
+
+.known-hosts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.known-host-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--termius-dark-card);
+  border: 1px solid var(--termius-dark-border);
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.known-host-item:hover {
+  background: var(--termius-dark-card-hover);
+}
+
+.known-host-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.known-host-address {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--termius-dark-text-bright);
+}
+
+.known-host-address svg {
+  color: var(--termius-accent);
+  flex-shrink: 0;
+}
+
+.known-host-port {
+  color: var(--termius-dark-text-muted);
+  font-weight: 400;
+}
+
+.known-host-fingerprint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--termius-dark-text-muted);
+  padding-left: 21px;
+}
+
+.known-host-keytype {
+  background: rgba(137, 180, 250, 0.12);
+  color: var(--termius-accent);
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.known-host-fingerprint code {
+  font-family: 'Fira Code', 'Courier New', monospace;
+  font-size: 11px;
+  color: var(--termius-dark-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.known-host-delete-btn {
+  background: transparent;
+  border: none;
+  color: var(--termius-dark-text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+.known-host-delete-btn:hover {
+  background: rgba(243, 139, 168, 0.15);
+  color: #f38ba8;
+}
+
+/* Light theme overrides for Known Hosts */
+body.theme-light .known-hosts-header {
+  border-bottom-color: var(--termius-light-border);
+}
+
+body.theme-light .known-hosts-header h3 {
+  color: var(--termius-light-text-bright);
+}
+
+body.theme-light .known-hosts-header p {
+  color: var(--termius-light-text-muted);
+}
+
+body.theme-light .known-hosts-empty {
+  color: var(--termius-light-text-muted);
+}
+
+body.theme-light .known-hosts-empty p {
+  color: var(--termius-light-text);
+}
+
+body.theme-light .known-host-item {
+  background: var(--termius-light-card);
+  border-color: var(--termius-light-border);
+}
+
+body.theme-light .known-host-item:hover {
+  background: var(--termius-light-card-hover);
+}
+
+body.theme-light .known-host-address {
+  color: var(--termius-light-text-bright);
+}
+
+body.theme-light .known-host-fingerprint {
+  color: var(--termius-light-text-muted);
+}
+
+body.theme-light .known-host-fingerprint code {
+  color: var(--termius-light-text-muted);
+}
+
+/* ==========================================================================
+   HOST CARD: EDIT BUTTON & MULTI-SELECT ACTION BAR
+   ========================================================================== */
+
+.host-edit-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(37, 99, 235, 0.12);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  border-radius: 6px;
+  color: var(--termius-accent);
+  cursor: pointer;
+  padding: 4px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.host-card:hover .host-edit-btn {
+  opacity: 1;
+}
+
+.host-edit-btn:hover {
+  background: rgba(37, 99, 235, 0.25);
+}
+
+.host-card.editing {
+  border-color: rgba(37, 99, 235, 0.6) !important;
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.host-selection-bar {
+  position: sticky;
+  bottom: 0;
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: var(--termius-dark-card);
+  border: 1px solid var(--termius-accent);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-shadow: 0 4px 20px rgba(37, 99, 235, 0.2);
+  z-index: 10;
+}
+
+.selection-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--termius-accent);
+}
+
+.selection-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.selection-action-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+}
+
+.selection-action-btn.connect {
+  background: var(--termius-accent);
+  color: #ffffff;
+}
+
+.selection-action-btn.connect:hover {
+  background: #1d4ed8;
+}
+
+.selection-action-btn.delete {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.selection-action-btn.delete:hover {
+  background: rgba(239, 68, 68, 0.25);
+}
+
+.selection-action-btn.clear {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--termius-dark-text-muted);
+  border: 1px solid var(--termius-dark-border);
+}
+
+.selection-action-btn.clear:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Light theme overrides for selection bar */
+body.theme-light .host-selection-bar {
+  background: #ffffff;
+  border-color: #2563eb;
+  box-shadow: 0 4px 20px rgba(37, 99, 235, 0.15);
+}
+
+body.theme-light .selection-action-btn.clear {
+  background: rgba(0, 0, 0, 0.04);
+  color: #6b7280;
+  border-color: rgba(0, 0, 0, 0.12);
 }

@@ -143,7 +143,7 @@ export default function LockScreen({ onUnlockSuccess }) {
           {/* Biometrics finger shortcut (if linked) */}
           {hasBiometrics ? (
             <button className="keypad-btn" onClick={handleBiometricUnlock} title="Unlock with Fingerprint">
-              <Fingerprint size={20} style={{ color: 'var(--accent)' }} />
+              <Fingerprint size={20} className="text-accent" />
             </button>
           ) : (
             <div />
@@ -171,7 +171,7 @@ export default function LockScreen({ onUnlockSuccess }) {
             <div className="biometric-scanner-icon">
               <Fingerprint size={24} />
             </div>
-            <span style={{ fontSize: '11px' }}>Unlock with Biometrics</span>
+            <span className="text-[11px]">Unlock with Biometrics</span>
           </button>
         )}
 

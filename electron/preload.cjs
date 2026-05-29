@@ -4,14 +4,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Lệnh SSH
   connectSSH: (profile) => ipcRenderer.send('ssh-connect', profile),
   onSSHData: (callback) => {
-    const subscription = (event, data) => callback(data);
+    const subscription = (event, payload) => callback(payload);
     ipcRenderer.on('ssh-data', subscription);
     return () => ipcRenderer.removeListener('ssh-data', subscription);
   },
-  writeSSHData: (data) => ipcRenderer.send('ssh-write', data),
+  writeSSHData: (tabId, data) => ipcRenderer.send('ssh-write', { tabId, data }),
   resizeSSH: (size) => ipcRenderer.send('ssh-resize', size),
   onSSHClose: (callback) => {
-    const subscription = () => callback();
+    const subscription = (event, tabId) => callback(tabId);
     ipcRenderer.on('ssh-close', subscription);
     return () => ipcRenderer.removeListener('ssh-close', subscription);
   },
@@ -44,5 +44,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sftpMkdir: (remotePath, folderName) => ipcRenderer.invoke('sftp-mkdir', remotePath, folderName),
   sftpUpload: (remotePath, fileName, content) => ipcRenderer.invoke('sftp-upload', remotePath, fileName, content),
   sftpDownload: (remotePath, fileName) => ipcRenderer.invoke('sftp-download', remotePath, fileName),
-  sftpRm: (remotePath, name) => ipcRenderer.invoke('sftp-rm', remotePath, name)
+  sftpRm: (remotePath, name) => ipcRenderer.invoke('sftp-rm', remotePath, name),
+  getKnownHosts: () => ipcRenderer.invoke('ssh-get-known-hosts'),
+  forgetHost: (hostPort) => ipcRenderer.invoke('ssh-forget-host', hostPort),
 });

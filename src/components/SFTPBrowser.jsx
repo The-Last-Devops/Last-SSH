@@ -324,14 +324,14 @@ export default function SFTPBrowser({
 
   // Xác định icon tệp tin
   const getItemIcon = (item) => {
-    if (item.type === 'dir') return <Folder size={16} className="sftp-item-icon" style={{ color: 'var(--term-blue)' }} />;
-    
+    if (item.type === 'dir') return <Folder size={16} className="sftp-item-icon text-[var(--term-blue)]" />;
+
     const ext = item.name.split('.').pop().toLowerCase();
     if (['html', 'css', 'js', 'jsx', 'ts', 'tsx', 'json', 'sql'].includes(ext)) {
-      return <FileCode size={16} className="sftp-item-icon" style={{ color: 'var(--term-green)' }} />;
+      return <FileCode size={16} className="sftp-item-icon text-term-green" />;
     }
     if (['txt', 'md', 'log'].includes(ext)) {
-      return <FileText size={16} className="sftp-item-icon" style={{ color: 'var(--text-main)' }} />;
+      return <FileText size={16} className="sftp-item-icon text-text-main" />;
     }
     return <File size={16} className="sftp-item-icon" />;
   };
@@ -342,23 +342,21 @@ export default function SFTPBrowser({
       <div className="sftp-header">
         <div className="sftp-title-row">
           <span className="sftp-title-text">
-            <Network size={14} style={{ color: 'var(--accent)' }} />
+            <Network size={14} className="text-accent" />
             SFTP FILE EXPLORER
           </span>
           <div className="sftp-controls">
-            <button 
-              className="glass-button" 
-              onClick={handleMkdir} 
+            <button
+              className="glass-button px-2 py-1"
+              onClick={handleMkdir}
               title="Create Folder"
-              style={{ padding: '4px 8px' }}
             >
               <FolderPlus size={14} />
             </button>
-            <button 
-              className="glass-button" 
-              onClick={handleUploadClick} 
+            <button
+              className="glass-button px-2 py-1"
+              onClick={handleUploadClick}
               title="Upload File"
-              style={{ padding: '4px 8px' }}
             >
               <Upload size={14} />
             </button>
@@ -383,25 +381,25 @@ export default function SFTPBrowser({
       <div className="sftp-file-area">
         {/* Trạng thái: Đang chờ SFTP kết nối */}
         {isDesktop && !isSftpReady && !sftpError && (
-          <div style={{ color: 'var(--text-muted)', fontSize: '11px', padding: '24px', textAlign: 'center' }}>
-            <div style={{ marginBottom: '8px', opacity: 0.6 }}>⏳</div>
+          <div className="text-text-muted text-[11px] p-6 text-center">
+            <div className="mb-2 opacity-60">⏳</div>
             Đang chờ SFTP session sẵn sàng...
           </div>
         )}
 
         {/* Trạng thái: Lỗi SFTP */}
         {sftpError && (
-          <div style={{ color: '#ff6b6b', fontSize: '11px', padding: '16px', textAlign: 'center', background: 'rgba(255,107,107,0.05)', margin: '8px', borderRadius: '6px', border: '1px solid rgba(255,107,107,0.15)' }}>
-            <div style={{ marginBottom: '4px', fontSize: '14px' }}>⚠️</div>
-            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>SFTP không khả dụng</div>
-            <div style={{ opacity: 0.8, fontSize: '10px' }}>{sftpError}</div>
+          <div className="text-[#ff6b6b] text-[11px] p-4 text-center bg-[rgba(255,107,107,0.05)] m-2 rounded-md border border-[rgba(255,107,107,0.15)]">
+            <div className="mb-1 text-sm">⚠️</div>
+            <div className="font-bold mb-1">SFTP không khả dụng</div>
+            <div className="opacity-80 text-[10px]">{sftpError}</div>
           </div>
         )}
 
         {/* Trạng thái: Đang tải */}
         {isLoading && (
-          <div style={{ color: 'var(--text-muted)', fontSize: '11px', padding: '24px', textAlign: 'center' }}>
-            <div style={{ marginBottom: '8px', opacity: 0.6 }}>🔄</div>
+          <div className="text-text-muted text-[11px] p-6 text-center">
+            <div className="mb-2 opacity-60">🔄</div>
             Đang tải danh sách tệp tin...
           </div>
         )}
@@ -409,7 +407,7 @@ export default function SFTPBrowser({
         {/* Danh sách tệp tin */}
         {!isLoading && isSftpReady && !sftpError && (
           items.length === 0 ? (
-            <div style={{ color: 'var(--text-muted)', fontSize: '11px', padding: '24px', textAlign: 'center' }}>
+            <div className="text-text-muted text-[11px] p-6 text-center">
               Empty directory
             </div>
           ) : (

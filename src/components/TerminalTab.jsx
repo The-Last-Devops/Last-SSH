@@ -71,6 +71,46 @@ export default function TerminalTab({
   const connectionActiveRef = useRef(false); // Guard chống double-connect
   const resizeObserverRef = useRef(null);
 
+  // Map settings.terminalTheme → xterm color palette
+  const getXtermTheme = (themeName) => {
+    if (themeName === 'Light') {
+      return {
+        background: '#fafafa',
+        foreground: '#383a42',
+        cursor: '#383a42',
+        cursorAccent: '#fafafa',
+        selectionBackground: 'rgba(56, 58, 66, 0.15)',
+        black: '#383a42', red: '#e45649', green: '#50a14f',
+        yellow: '#c18401', blue: '#4078f2', magenta: '#a626a4',
+        cyan: '#0184bc', white: '#a0a1a7',
+        brightBlack: '#696c77', brightRed: '#e45649', brightGreen: '#50a14f',
+        brightYellow: '#986801', brightBlue: '#4078f2', brightMagenta: '#a626a4',
+        brightCyan: '#0184bc', brightWhite: '#383a42'
+      };
+    }
+    // Default: neutral dark (Dark theme)
+    return {
+      background: '#1c1c1c',
+      foreground: '#e8e8e8',
+      cursor: '#e8e8e8',
+      cursorAccent: '#1c1c1c',
+      selectionBackground: 'rgba(100, 120, 200, 0.35)',
+      black: '#1c1c1c', red: '#ff5c57', green: '#5af78e',
+      yellow: '#f3f99d', blue: '#57c7ff', magenta: '#ff6ac1',
+      cyan: '#9aedfe', white: '#f1f1f0',
+      brightBlack: '#686868', brightRed: '#ff6e67', brightGreen: '#5af78e',
+      brightYellow: '#f4f99d', brightBlue: '#6fc5ff', brightMagenta: '#ff92d0',
+      brightCyan: '#9aedfe', brightWhite: '#ffffff'
+    };
+  };
+
+  // Cập nhật màu terminal khi settings.terminalTheme thay đổi
+  useEffect(() => {
+    const term = terminalInstanceRef.current;
+    if (!term) return;
+    term.options.theme = getXtermTheme(settings.terminalTheme);
+  }, [settings.terminalTheme]);
+
   useEffect(() => {
     // Chỉ kích hoạt terminal thật nếu chạy trong Electron Desktop App và tab là SSH hoặc LOCAL
     if (!isDesktop || !xtermRef.current || (tab.type !== 'ssh' && tab.type !== 'local')) return;
@@ -81,35 +121,13 @@ export default function TerminalTab({
     // Khởi tạo Xterm.js
     const term = new Terminal({
       cursorBlink: true,
-      fontFamily: '"Courier New", Courier, monospace', // Font an toàn, luôn render được
-      fontSize: settings.fontSize || 14,
+      fontFamily: '"Menlo", "Fira Code", "Cascadia Code", "Courier New", monospace',
+      fontSize: settings.fontSize || 13,
       fontWeight: 'normal',
       lineHeight: 1.3,
       letterSpacing: 0,
       cursorStyle: settings.cursorStyle || 'block',
-      theme: {
-        background: '#0d1117',
-        foreground: '#c9d1d9',
-        cursor: '#58a6ff',
-        cursorAccent: '#0d1117',
-        selectionBackground: 'rgba(88, 166, 255, 0.3)',
-        black: '#484f58',
-        red: '#ff7b72',
-        green: '#3fb950',
-        yellow: '#d29922',
-        blue: '#58a6ff',
-        magenta: '#bc8cff',
-        cyan: '#39c5cf',
-        white: '#b1bac4',
-        brightBlack: '#6e7681',
-        brightRed: '#ffa198',
-        brightGreen: '#56d364',
-        brightYellow: '#e3b341',
-        brightBlue: '#79c0ff',
-        brightMagenta: '#d2a8ff',
-        brightCyan: '#56d4dd',
-        brightWhite: '#f0f6fc'
-      }
+      theme: getXtermTheme(settings.terminalTheme)
     });
 
     const fitAddon = new FitAddon();
@@ -121,13 +139,13 @@ export default function TerminalTab({
     // Delay fit để đợi DOM render xong kích thước thật
     const fitSafely = () => {
       try {
-        if (xtermRef.current && xtermRef.current.offsetWidth > 0) {
+        if (xtermRef.current && xtermRef.current.offsetWidth > 0 && xtermRef.current.offsetHeight > 0) {
           fitAddon.fit();
           // Sau khi fit, notify server về kích thước thật để top/vim hiển đúng
           const { cols, rows } = term;
           if (cols > 0 && rows > 0) {
             if (tab.type === 'ssh') {
-              window.electronAPI.resizeSSH({ cols, rows });
+              window.electronAPI.resizeSSH({ tabId: tab.id, cols, rows });
             } else if (tab.type === 'local') {
               window.electronAPI.resizeLocal({ tabId: tab.id, cols, rows });
             }
@@ -164,13 +182,26 @@ export default function TerminalTab({
 
     // Đăng ký luồng nhận dữ liệu từ Electron truyền lên
     if (tab.type === 'ssh') {
-      removeDataListener = window.electronAPI.onSSHData((data) => {
-        term.write(data);
+      let shellSizeConfirmed = false;
+      removeDataListener = window.electronAPI.onSSHData((payload) => {
+        if (payload.tabId === tab.id) {
+          term.write(payload.data);
+          // Khi nhận data đầu tiên, shell đã sẵn sàng — gửi lại kích thước thực tế
+          if (!shellSizeConfirmed) {
+            shellSizeConfirmed = true;
+            const { cols, rows } = term;
+            if (cols > 0 && rows > 0) {
+              window.electronAPI.resizeSSH({ tabId: tab.id, cols, rows });
+            }
+          }
+        }
       });
 
       // Lắng nghe đóng kết nối SSH
-      removeCloseListener = window.electronAPI.onSSHClose(() => {
-        term.write('\r\n\x1b[1;31m[SSH] Kết nối bị đóng bởi server từ xa.\x1b[0m\r\n');
+      removeCloseListener = window.electronAPI.onSSHClose((closedTabId) => {
+        if (closedTabId === tab.id) {
+          term.write('\r\n\x1b[1;31m[SSH] Kết nối bị đóng bởi server từ xa.\x1b[0m\r\n');
+        }
       });
     } else if (tab.type === 'local') {
       removeDataListener = window.electronAPI.onLocalData((payload) => {
@@ -189,7 +220,7 @@ export default function TerminalTab({
     // Đăng ký luồng gõ phím từ Xterm gửi xuống Electron qua IPC
     const onDataDisposable = term.onData((data) => {
       if (tab.type === 'ssh') {
-        window.electronAPI.writeSSHData(data);
+        window.electronAPI.writeSSHData(tab.id, data);
       } else if (tab.type === 'local') {
         window.electronAPI.writeLocalData(tab.id, data);
       }
@@ -458,17 +489,11 @@ export default function TerminalTab({
   // --------------------------------------------------------------------------
   if (isDesktop && (tab.type === 'ssh' || tab.type === 'local')) {
     return (
-      <div 
-        ref={xtermRef} 
-        className="xterm-terminal-container" 
+      <div
+        ref={xtermRef}
+        className="xterm-terminal-container"
         onClick={handleContainerClick}
-        style={{
-          width: '100%',
-          height: '100%',
-          background: '#0d1117',
-          overflow: 'hidden',
-          boxSizing: 'border-box'
-        }}
+        style={{ background: getXtermTheme(settings.terminalTheme).background }}
       />
     );
   }
@@ -502,7 +527,7 @@ export default function TerminalTab({
       </div>
 
       {autocompleteSuggestions && (
-        <div className="terminal-line type-system" style={{ marginTop: '8px', opacity: 0.8 }}>
+        <div className="terminal-line type-system mt-2 opacity-80">
           Gợi ý: {autocompleteSuggestions.join('   ')}
         </div>
       )}

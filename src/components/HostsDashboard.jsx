@@ -1,17 +1,17 @@
-import { useState, useRef } from 'react';
-import { 
-  Search, 
-  Plus, 
-  Server, 
-  Key, 
-  Network, 
-  FileCode, 
-  ShieldCheck, 
-  History, 
-  Grid, 
-  List, 
-  Tag, 
-  ArrowUpDown, 
+import { useState, useRef, useEffect } from 'react';
+import {
+  Search,
+  Plus,
+  Server,
+  Key,
+  Network,
+  FileCode,
+  ShieldCheck,
+  History,
+  Grid,
+  List,
+  Tag,
+  ArrowUpDown,
   SlidersHorizontal,
   Trash2,
   X,
@@ -52,15 +52,17 @@ export default function HostsDashboard({
   onOpenSettings,
   onOpenP2PSync
 }) {
-  const [activeSubTab, setActiveSubTab] = useState('hosts'); // 'hosts', 'keychain', 'port-forwarding', 'snippets', 'known-hosts', 'logs'
+  const [activeSubTab, setActiveSubTab] = useState('hosts');
+  const [knownHostsList, setKnownHostsList] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
-  
+
   // Pane Detail/Form states
-  const [selectedHostId, setSelectedHostId] = useState(null);
+  const [selectedHostIds, setSelectedHostIds] = useState(new Set());
+  const [editingHostId, setEditingHostId] = useState(null);
   const [isPaneOpen, setIsPaneOpen] = useState(false);
   const [isNewHostMode, setIsNewHostMode] = useState(false);
-  
+
   // Form input states (for Add/Edit host)
   const [hostLabel, setHostLabel] = useState('');
   const [hostAddress, setHostAddress] = useState('');
@@ -148,16 +150,31 @@ export default function HostsDashboard({
       return;
     }
 
-    setSelectedHostId(host.id);
+    // Toggle selection: add if not selected, remove if already selected
+    setSelectedHostIds(prev => {
+      const next = new Set(prev);
+      if (next.has(host.id)) {
+        next.delete(host.id);
+      } else {
+        next.add(host.id);
+      }
+      return next;
+    });
+  };
+
+  // Mở pane chỉnh sửa cho host
+  const handleEditClick = (host, e) => {
+    e.stopPropagation();
+    setEditingHostId(host.id);
     setIsNewHostMode(false);
-    
+    setIsPaneOpen(true);
+
     setHostLabel(host.label || '');
     setHostAddress(host.host || '');
     setHostPort(host.port || '22');
     setHostUsername(host.username || 'ubuntu');
     setHostPassword(host.password || '');
-    
-    // Đồng bộ group folder dropdown
+
     const groupName = host.group || 'Servers';
     setSelectedGroup(groupName);
     setShowCustomGroupInput(false);
@@ -166,9 +183,8 @@ export default function HostsDashboard({
     setHostTags((host.tags || []).join(', '));
     setHostKeyId(host.keyId || '');
     setHostIdentityId(host.identityId || '');
-    setHostOpenWithSFTP(!!host.openWithSFTP);
-    
-    setIsPaneOpen(true);
+    setHostOpenWithSFTP(host.openWithSFTP || false);
+    setShowPassword(false);
   };
 
   const handleHostDoubleClick = (host) => {
@@ -181,15 +197,16 @@ export default function HostsDashboard({
 
   // Kích hoạt chế độ thêm mới host
   const handleNewHostClick = () => {
-    setSelectedHostId(null);
+    setEditingHostId(null);
+    setSelectedHostIds(new Set());
     setIsNewHostMode(true);
-    
+
     setHostLabel('');
     setHostAddress('');
     setHostPort('22');
     setHostUsername('ubuntu');
     setHostPassword('');
-    
+
     setSelectedGroup('Servers');
     setShowCustomGroupInput(false);
     setCustomGroupValue('');
@@ -198,21 +215,21 @@ export default function HostsDashboard({
     setHostKeyId('');
     setHostIdentityId('');
     setHostOpenWithSFTP(false);
-    
+
     setIsPaneOpen(true);
   };
 
   // Đóng pane chi tiết
   const handleClosePane = () => {
     setIsPaneOpen(false);
-    setSelectedHostId(null);
+    setEditingHostId(null);
     setIsNewHostMode(false);
   };
 
   // Submit Lưu Host (thêm mới hoặc chỉnh sửa)
   const handleSaveHost = (e) => {
     if (e) e.preventDefault();
-    
+
     if (!hostLabel.trim() || !hostAddress.trim()) {
       alert('Vui lòng nhập đầy đủ Nhãn và Địa chỉ máy chủ (Host Address)!');
       return;
@@ -221,7 +238,7 @@ export default function HostsDashboard({
     // Chọn group từ dropdown hoặc custom input
     const finalGroup = showCustomGroupInput ? customGroupValue.trim() : selectedGroup;
     const tagsArray = hostTags.split(',').map(t => t.trim()).filter(Boolean);
-    
+
     const hostData = {
       label: hostLabel.trim(),
       host: hostAddress.trim(),
@@ -238,8 +255,8 @@ export default function HostsDashboard({
 
     if (isNewHostMode) {
       onAddConnection(hostData);
-    } else if (selectedHostId) {
-      onEditConnection(selectedHostId, hostData);
+    } else if (editingHostId) {
+      onEditConnection(editingHostId, hostData);
     }
 
     handleClosePane();
@@ -247,19 +264,19 @@ export default function HostsDashboard({
 
   // Xóa Host
   const handleDeleteHost = () => {
-    if (!selectedHostId) return;
+    if (!editingHostId) return;
     if (window.confirm(`Bạn có chắc chắn muốn xóa host "${hostLabel}" không?`)) {
-      onDeleteConnection(selectedHostId);
+      onDeleteConnection(editingHostId);
       handleClosePane();
     }
   };
 
   // Kết nối SSH thực tế
   const handleConnect = () => {
-    if (isNewHostMode || !selectedHostId) return;
-    
+    if (isNewHostMode || !editingHostId) return;
+
     const hostData = {
-      id: selectedHostId,
+      id: editingHostId,
       label: hostLabel,
       host: hostAddress,
       port: hostPort,
@@ -268,7 +285,7 @@ export default function HostsDashboard({
       keyId: hostKeyId,
       identityId: hostIdentityId
     };
-    
+
     onConnectSSH(hostData);
   };
 
@@ -381,6 +398,48 @@ export default function HostsDashboard({
     onConnectSSH(tempProfile);
   };
 
+  // Known Hosts helpers
+  const isDesktop = typeof window !== 'undefined' && !!window.electronAPI?.getKnownHosts;
+
+  useEffect(() => {
+    if (activeSubTab === 'known-hosts') loadKnownHosts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSubTab]);
+
+  const loadKnownHosts = async () => {
+    if (!isDesktop) return;
+    try {
+      const hosts = await window.electronAPI.getKnownHosts();
+      setKnownHostsList(
+        Object.entries(hosts).map(([hostPort, fingerprint]) => ({ hostPort, fingerprint }))
+      );
+    } catch (_e) {}
+  };
+
+  const handleForgetHost = async (hostPort) => {
+    if (!isDesktop) return;
+    try {
+      await window.electronAPI.forgetHost(hostPort);
+      setKnownHostsList(prev => prev.filter(h => h.hostPort !== hostPort));
+    } catch (_e) {}
+  };
+
+  const getKeyType = (fp) => {
+    if (typeof fp !== 'string') return 'ssh';
+    try {
+      const buf = atob(fp);
+      if (buf.includes('ssh-ed25519')) return 'ed25519';
+      if (buf.includes('ecdsa-sha2')) return 'ecdsa';
+      if (buf.includes('ssh-rsa')) return 'rsa';
+    } catch (_e) {}
+    return 'ssh';
+  };
+
+  const abbreviate = (fp) => {
+    if (typeof fp !== 'string' || fp.length < 20) return fp;
+    return fp.slice(0, 18) + '…' + fp.slice(-8);
+  };
+
   return (
     <div className="hosts-dashboard-wrapper">
       {/* CỘT 1: Left Sub-sidebar */}
@@ -388,42 +447,42 @@ export default function HostsDashboard({
         <div className="sub-sidebar-top">
           <div className="sub-sidebar-title">Last SSH</div>
           <nav className="sub-sidebar-nav">
-            <button 
+            <button
               className={`sub-sidebar-item ${activeSubTab === 'hosts' ? 'active' : ''}`}
               onClick={() => { setActiveSubTab('hosts'); handleClosePane(); }}
             >
               <Server size={16} />
               <span>Hosts</span>
             </button>
-            <button 
+            <button
               className={`sub-sidebar-item ${activeSubTab === 'keychain' ? 'active' : ''}`}
               onClick={() => { setActiveSubTab('keychain'); handleClosePane(); }}
             >
               <Key size={16} />
               <span>Keychain</span>
             </button>
-            <button 
+            <button
               className={`sub-sidebar-item ${activeSubTab === 'port-forwarding' ? 'active' : ''}`}
               onClick={() => { setActiveSubTab('port-forwarding'); handleClosePane(); }}
             >
               <Network size={16} />
               <span>Port Forwarding</span>
             </button>
-            <button 
+            <button
               className={`sub-sidebar-item ${activeSubTab === 'snippets' ? 'active' : ''}`}
               onClick={() => { setActiveSubTab('snippets'); handleClosePane(); }}
             >
               <FileCode size={16} />
               <span>Snippets</span>
             </button>
-            <button 
+            <button
               className={`sub-sidebar-item ${activeSubTab === 'known-hosts' ? 'active' : ''}`}
               onClick={() => { setActiveSubTab('known-hosts'); handleClosePane(); }}
             >
               <ShieldCheck size={16} />
               <span>Known Hosts</span>
             </button>
-            <button 
+            <button
               className={`sub-sidebar-item ${activeSubTab === 'logs' ? 'active' : ''}`}
               onClick={() => { setActiveSubTab('logs'); handleClosePane(); }}
             >
@@ -435,8 +494,8 @@ export default function HostsDashboard({
 
         {/* Sub-sidebar Bottom: Settings & P2P Sync (Chuyển từ sidebar cũ sang) */}
         <div className="sub-sidebar-bottom">
-          <button 
-            className="sub-sidebar-item" 
+          <button
+            className="sub-sidebar-item"
             onClick={onOpenP2PSync}
             id="btn-dashboard-p2p"
             title="P2P WebRTC Sync"
@@ -444,8 +503,8 @@ export default function HostsDashboard({
             <FolderSync size={16} />
             <span>P2P Sync</span>
           </button>
-          <button 
-            className="sub-sidebar-item" 
+          <button
+            className="sub-sidebar-item"
             onClick={onOpenSettings}
             id="btn-dashboard-settings"
             title="Preferences"
@@ -463,35 +522,25 @@ export default function HostsDashboard({
           <form className="quick-connect-form" onSubmit={handleQuickConnectSubmit}>
             <div className="search-input-wrapper">
               <Search size={16} className="search-icon" />
-              <input 
-                type="text" 
-                placeholder="Find a host or ssh user@hostname..." 
+              <input
+                type="text"
+                placeholder="Find a host or ssh user@hostname..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 id="sidebar-search-input"
               />
               {searchQuery && (
-                <button 
-                  type="button" 
-                  className="clear-search-btn" 
+                <button
+                  type="button"
                   onClick={() => setSearchQuery('')}
-                  style={{
-                    position: 'absolute',
-                    right: '12px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'transparent',
-                    border: 'none',
-                    color: 'var(--termius-dark-text-muted)',
-                    cursor: 'pointer'
-                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 bg-transparent border-none text-[var(--termius-dark-text-muted)] cursor-pointer"
                 >
                   <X size={14} />
                 </button>
               )}
             </div>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="quick-connect-btn"
               disabled={!searchQuery.trim()}
             >
@@ -512,15 +561,15 @@ export default function HostsDashboard({
           </div>
           <div className="toolbar-right">
             <div className="view-toggle">
-              <button 
-                className={`view-btn ${viewMode === 'grid' ? 'active' : ''}`} 
+              <button
+                className={`view-btn ${viewMode === 'grid' ? 'active' : ''}`}
                 onClick={() => setViewMode('grid')}
                 title="Grid view"
               >
                 <Grid size={14} />
               </button>
-              <button 
-                className={`view-btn ${viewMode === 'list' ? 'active' : ''}`} 
+              <button
+                className={`view-btn ${viewMode === 'list' ? 'active' : ''}`}
                 onClick={() => setViewMode('list')}
                 title="List view"
               >
@@ -542,7 +591,7 @@ export default function HostsDashboard({
 
         {/* Dynamic Sub-tab Views */}
         <div className="dashboard-main-view">
-          
+
           {/* TAB 1: HOSTS VIEW (Nhóm theo Folder Group chuẩn chỉnh) */}
           {activeSubTab === 'hosts' && (
             <div className="hosts-view-container">
@@ -553,57 +602,96 @@ export default function HostsDashboard({
                   <p>Hãy tạo một máy chủ mới bằng cách bấm vào nút "NEW HOST" ở trên.</p>
                 </div>
               ) : (
-                <div className="group-folders-list" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  {Object.keys(groupedHosts).map(groupName => (
-                    <div key={groupName} className="group-folder-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <div 
-                        className="group-folder-header"
-                        style={{
-                          fontSize: '12px',
-                          fontWeight: '700',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.5px',
-                          color: 'var(--termius-dark-text-muted)',
-                          paddingBottom: '6px',
-                          borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
-                        }}
-                      >
-                        📁 {groupName}
+                <>
+                  <div className="group-folders-list flex flex-col gap-6">
+                    {Object.keys(groupedHosts).map(groupName => (
+                      <div key={groupName} className="group-folder-wrapper flex flex-col gap-2.5">
+                        <div className="group-folder-header text-xs font-bold uppercase tracking-wide text-[var(--termius-dark-text-muted)] pb-1.5 border-b border-white/5">
+                          📁 {groupName}
+                        </div>
+                        <div className={`hosts-container-${viewMode}`}>
+                          {groupedHosts[groupName].map(conn => {
+                            const isSelected = selectedHostIds.has(conn.id);
+                            const isEditing = conn.id === editingHostId;
+                            return (
+                              <div
+                                key={conn.id}
+                                className={`host-card connection-item ${isSelected ? 'selected' : ''} ${isEditing ? 'editing' : ''}`}
+                                onClick={() => handleHostClick(conn)}
+                                onDoubleClick={() => handleHostDoubleClick(conn)}
+                                title="Click để chọn, double click để kết nối"
+                              >
+                                <div className="host-card-icon">
+                                  {conn.local ? <Laptop /> : <UbuntuIcon />}
+                                </div>
+                                <div className="host-card-info">
+                                  <div className="host-card-label">{conn.label}</div>
+                                  <div className="host-card-sub">
+                                    {conn.local ? 'Local shell on this machine' : `ssh, ${conn.username}@${conn.host}:${conn.port}`}
+                                  </div>
+                                </div>
+                                {conn.tags && conn.tags.length > 0 && (
+                                  <div className="host-card-tags">
+                                    {conn.tags.map((t, idx) => (
+                                      <span key={idx} className="host-tag-pill tag-badge">{t}</span>
+                                    ))}
+                                  </div>
+                                )}
+                                {!conn.local && (
+                                  <button
+                                    className="host-edit-btn"
+                                    onClick={(e) => handleEditClick(conn, e)}
+                                    title="Chỉnh sửa host"
+                                  >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                    </svg>
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                      <div className={`hosts-container-${viewMode}`}>
-                        {groupedHosts[groupName].map(conn => {
-                          const isSelected = conn.id === selectedHostId;
-                          return (
-                            <div 
-                              key={conn.id} 
-                              className={`host-card connection-item ${isSelected ? 'selected' : ''}`}
-                              onClick={() => handleHostClick(conn)}
-                              onDoubleClick={() => handleHostDoubleClick(conn)}
-                              title="Double click to connect instantly"
-                            >
-                              <div className="host-card-icon">
-                                {conn.local ? <Laptop /> : <UbuntuIcon />}
-                              </div>
-                              <div className="host-card-info">
-                                <div className="host-card-label">{conn.label}</div>
-                                <div className="host-card-sub">
-                                  {conn.local ? 'Local shell on this machine' : `ssh, ${conn.username}@${conn.host}:${conn.port}`}
-                                </div>
-                              </div>
-                              {conn.tags && conn.tags.length > 0 && (
-                                <div className="host-card-tags">
-                                  {conn.tags.map((t, idx) => (
-                                    <span key={idx} className="host-tag-pill tag-badge">{t}</span>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
+                    ))}
+                  </div>
+
+                  {selectedHostIds.size > 0 && (
+                    <div className="host-selection-bar">
+                      <span className="selection-count">{selectedHostIds.size} host{selectedHostIds.size > 1 ? 's' : ''} đã chọn</span>
+                      <div className="selection-actions">
+                        <button
+                          className="selection-action-btn connect"
+                          onClick={() => {
+                            const firstId = [...selectedHostIds][0];
+                            const host = connections.find(c => c.id === firstId);
+                            if (host) onConnectSSH(host);
+                          }}
+                        >
+                          Connect
+                        </button>
+                        <button
+                          className="selection-action-btn delete"
+                          onClick={() => {
+                            if (window.confirm(`Xóa ${selectedHostIds.size} host đã chọn?`)) {
+                              selectedHostIds.forEach(id => onDeleteConnection(id));
+                              setSelectedHostIds(new Set());
+                            }
+                          }}
+                        >
+                          Xóa
+                        </button>
+                        <button
+                          className="selection-action-btn clear"
+                          onClick={() => setSelectedHostIds(new Set())}
+                        >
+                          Bỏ chọn
+                        </button>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -611,28 +699,27 @@ export default function HostsDashboard({
           {/* TAB 2: KEYCHAIN VIEW */}
           {activeSubTab === 'keychain' && (
             <div className="keychain-view-container">
-              <div className="keychain-grid-layout" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
-                
+              <div className="keychain-grid-layout grid grid-cols-2 gap-8">
+
                 {/* PHẦN 1: KEYS MANAGER */}
                 <div className="keychain-section">
                   <div className="keychain-header">
                     <h2>Keys (Private Keys)</h2>
-                    <button 
-                      className="add-key-btn" 
+                    <button
+                      className="add-key-btn"
                       onClick={() => setShowKeyForm(!showKeyForm)}
-                      style={{ padding: '4px 8px', fontSize: '11px' }}
                     >
                       {showKeyForm ? 'Đóng' : 'Thêm Key'}
                     </button>
                   </div>
 
                   {showKeyForm && (
-                    <form className="keychain-add-form animate-slide-down" onSubmit={handleAddNewKeySubmit} style={{ marginBottom: '20px', padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <form className="keychain-add-form animate-slide-down mb-5" onSubmit={handleAddNewKeySubmit}>
                       <h3>Thêm Private Key</h3>
                       <div className="form-group">
                         <label>Nhãn (Tên gợi nhớ)</label>
-                        <input 
-                          type="text" 
+                        <input
+                          type="text"
                           placeholder="e.g. kien-private.pem"
                           value={keyLabel}
                           onChange={(e) => setKeyLabel(e.target.value)}
@@ -640,68 +727,66 @@ export default function HostsDashboard({
                         />
                       </div>
                       <div className="form-group">
-                        <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label className="flex justify-between items-center">
                           Nội dung Private Key (PEM format)
-                          <button 
-                            type="button" 
+                          <button
+                            type="button"
                             className="file-upload-btn-secondary"
                             onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                            style={{ padding: '2px 6px', fontSize: '10px' }}
                           >
-                            <Upload size={10} style={{ marginRight: '2px' }} /> Chọn file .pem
+                            <Upload size={10} className="mr-0.5" /> Chọn file .pem
                           </button>
                         </label>
-                        <textarea 
+                        <textarea
                           placeholder="-----BEGIN RSA PRIVATE KEY-----..."
                           value={keyContent}
                           onChange={(e) => setKeyContent(e.target.value)}
                           rows={4}
                           required
-                          style={{ fontFamily: 'monospace', fontSize: '11px' }}
+                          className="font-mono text-[11px]"
                         />
-                        <input 
-                          type="file" 
-                          ref={fileInputRef} 
-                          style={{ display: 'none' }} 
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          className="hidden"
                           onChange={handleKeyFileChange}
                           accept=".pem,.key,.txt,*"
                         />
                       </div>
                       <div className="form-actions-row">
-                        <button type="submit" className="save-btn-primary" style={{ padding: '4px 10px', fontSize: '12px' }}>Lưu khóa</button>
-                        <button type="button" className="cancel-btn-secondary" onClick={() => setShowKeyForm(false)} style={{ padding: '4px 10px', fontSize: '12px' }}>Hủy</button>
+                        <button type="submit" className="save-btn-primary px-2.5 py-1 text-xs">Lưu khóa</button>
+                        <button type="button" className="cancel-btn-secondary px-2.5 py-1 text-xs" onClick={() => setShowKeyForm(false)}>Hủy</button>
                       </div>
                     </form>
                   )}
 
                   <div className="keys-list-container">
                     {(!keys || keys.length === 0) ? (
-                      <div className="empty-state-small" style={{ padding: '30px', textAlign: 'center', color: 'var(--termius-dark-text-muted)' }}>
-                        <Key size={32} style={{ marginBottom: '8px', opacity: 0.5 }} />
-                        <p style={{ fontSize: '12px' }}>Chưa có khóa private key nào.</p>
+                      <div className="empty-state-small p-8 text-center text-[var(--termius-dark-text-muted)]">
+                        <Key size={32} className="mb-2 opacity-50 mx-auto" />
+                        <p className="text-xs">Chưa có khóa private key nào.</p>
                       </div>
                     ) : (
-                      <div className="keys-stack" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div className="keys-stack flex flex-col gap-2.5">
                         {keys.map(k => (
-                          <div key={k.id} className="key-card-compact" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: 'var(--termius-dark-card)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <div className="key-card-icon-small" style={{ color: 'var(--termius-accent)' }}>
+                          <div key={k.id} className="key-card-compact flex items-center justify-between p-3 bg-[var(--termius-dark-card)] rounded-lg border border-white/[0.03]">
+                            <div className="flex items-center gap-2.5">
+                              <div className="key-card-icon-small text-[var(--termius-accent)]">
                                 <Key size={16} />
                               </div>
                               <div>
-                                <div style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--termius-dark-text)' }}>{k.label}</div>
-                                <div style={{ fontSize: '11px', color: 'var(--termius-dark-text-muted)' }}>Type RSA ({k.keyContent ? k.keyContent.length : 0} B)</div>
+                                <div className="text-[13px] font-bold text-[var(--termius-dark-text)]">{k.label}</div>
+                                <div className="text-[11px] text-[var(--termius-dark-text-muted)]">Type RSA ({k.keyContent ? k.keyContent.length : 0} B)</div>
                               </div>
                             </div>
-                            <button 
+                            <button
                               type="button"
-                              className="key-delete-btn" 
+                              className="key-delete-btn bg-transparent border-none text-red-500 cursor-pointer"
                               onClick={() => {
                                 if (window.confirm(`Bạn có chắc chắn muốn xóa khóa "${k.label}"?`)) {
                                   onDeleteKey(k.id);
                                 }
                               }}
-                              style={{ background: 'transparent', border: 'none', color: '#ff4d4f', cursor: 'pointer' }}
                             >
                               <Trash2 size={12} />
                             </button>
@@ -716,23 +801,22 @@ export default function HostsDashboard({
                 <div className="keychain-section">
                   <div className="keychain-header">
                     <h2>Identities (Tài khoản)</h2>
-                    <button 
-                      className="add-key-btn" 
+                    <button
+                      className="add-key-btn"
                       onClick={() => setShowIdentityForm(!showIdentityForm)}
-                      style={{ padding: '4px 8px', fontSize: '11px' }}
                     >
                       {showIdentityForm ? 'Đóng' : 'Thêm Identity'}
                     </button>
                   </div>
 
                   {showIdentityForm && (
-                    <form className="keychain-add-form animate-slide-down" onSubmit={handleAddIdentitySubmit} style={{ marginBottom: '20px', padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <form className="keychain-add-form animate-slide-down mb-5" onSubmit={handleAddIdentitySubmit}>
                       <h3>Thêm Định danh mới</h3>
-                      
+
                       <div className="form-group">
                         <label>Nhãn định danh (Tên gợi nhớ)</label>
-                        <input 
-                          type="text" 
+                        <input
+                          type="text"
                           placeholder="e.g. kien'ssh(sen)"
                           value={identityLabel}
                           onChange={(e) => setIdentityLabel(e.target.value)}
@@ -742,8 +826,8 @@ export default function HostsDashboard({
 
                       <div className="form-group">
                         <label>SSH Username</label>
-                        <input 
-                          type="text" 
+                        <input
+                          type="text"
                           placeholder="e.g. kiennt"
                           value={identityUsername}
                           onChange={(e) => setIdentityUsername(e.target.value)}
@@ -753,7 +837,7 @@ export default function HostsDashboard({
 
                       <div className="form-group">
                         <label>Phương thức xác thực</label>
-                        <select 
+                        <select
                           value={identityAuthType}
                           onChange={(e) => setIdentityAuthType(e.target.value)}
                           className="key-select-dropdown"
@@ -767,15 +851,15 @@ export default function HostsDashboard({
                         <div className="form-group">
                           <label>Mật khẩu</label>
                           <div className="password-input-wrapper">
-                            <input 
+                            <input
                               type={showIdentityPassword ? 'text' : 'password'}
                               placeholder="Nhập mật khẩu SSH..."
                               value={identityPassword}
                               onChange={(e) => setIdentityPassword(e.target.value)}
                               required
                             />
-                            <button 
-                              type="button" 
+                            <button
+                              type="button"
                               className="password-toggle-btn"
                               onClick={() => setShowIdentityPassword(!showIdentityPassword)}
                             >
@@ -786,7 +870,7 @@ export default function HostsDashboard({
                       ) : (
                         <div className="form-group">
                           <label>Chọn khóa liên kết từ Keychain</label>
-                          <select 
+                          <select
                             value={identityKeyId}
                             onChange={(e) => setIdentityKeyId(e.target.value)}
                             className="key-select-dropdown"
@@ -801,44 +885,43 @@ export default function HostsDashboard({
                       )}
 
                       <div className="form-actions-row">
-                        <button type="submit" className="save-btn-primary" style={{ padding: '4px 10px', fontSize: '12px' }}>Lưu định danh</button>
-                        <button type="button" className="cancel-btn-secondary" onClick={() => setShowIdentityForm(false)} style={{ padding: '4px 10px', fontSize: '12px' }}>Hủy</button>
+                        <button type="submit" className="save-btn-primary px-2.5 py-1 text-xs">Lưu định danh</button>
+                        <button type="button" className="cancel-btn-secondary px-2.5 py-1 text-xs" onClick={() => setShowIdentityForm(false)}>Hủy</button>
                       </div>
                     </form>
                   )}
 
                   <div className="keys-list-container">
                     {(!identities || identities.length === 0) ? (
-                      <div className="empty-state-small" style={{ padding: '30px', textAlign: 'center', color: 'var(--termius-dark-text-muted)' }}>
-                        <Laptop size={32} style={{ marginBottom: '8px', opacity: 0.5 }} />
-                        <p style={{ fontSize: '12px' }}>Chưa có định danh (identity) nào.</p>
+                      <div className="empty-state-small p-8 text-center text-[var(--termius-dark-text-muted)]">
+                        <Laptop size={32} className="mb-2 opacity-50 mx-auto" />
+                        <p className="text-xs">Chưa có định danh (identity) nào.</p>
                       </div>
                     ) : (
-                      <div className="keys-stack" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div className="keys-stack flex flex-col gap-2.5">
                         {identities.map(id => {
                           const linkedKey = keys.find(k => k.id === id.keyId);
                           return (
-                            <div key={id.id} className="key-card-compact" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: 'var(--termius-dark-card)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <div className="key-card-icon-small" style={{ color: 'var(--termius-accent)' }}>
+                            <div key={id.id} className="key-card-compact flex items-center justify-between p-3 bg-[var(--termius-dark-card)] rounded-lg border border-white/[0.03]">
+                              <div className="flex items-center gap-2.5">
+                                <div className="key-card-icon-small text-[var(--termius-accent)]">
                                   <Laptop size={16} />
                                 </div>
                                 <div>
-                                  <div style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--termius-dark-text)' }}>{id.label}</div>
-                                  <div style={{ fontSize: '11px', color: 'var(--termius-dark-text-muted)' }}>
+                                  <div className="text-[13px] font-bold text-[var(--termius-dark-text)]">{id.label}</div>
+                                  <div className="text-[11px] text-[var(--termius-dark-text-muted)]">
                                     user: {id.username} | auth: {id.authType === 'key' ? `key (${linkedKey ? linkedKey.label : 'Khóa đã bị xóa'})` : 'password'}
                                   </div>
                                 </div>
                               </div>
-                              <button 
+                              <button
                                 type="button"
-                                className="key-delete-btn" 
+                                className="key-delete-btn bg-transparent border-none text-red-500 cursor-pointer"
                                 onClick={() => {
                                   if (window.confirm(`Bạn có chắc chắn muốn xóa định danh "${id.label}"?`)) {
                                     onDeleteIdentity(id.id);
                                   }
                                 }}
-                                style={{ background: 'transparent', border: 'none', color: '#ff4d4f', cursor: 'pointer' }}
                               >
                                 <Trash2 size={12} />
                               </button>
@@ -873,13 +956,55 @@ export default function HostsDashboard({
             </div>
           )}
 
-          {activeSubTab === 'known-hosts' && (
-            <div className="simulated-view-container">
-              <ShieldCheck size={64} className="simulated-icon" />
-              <h2>Known Hosts list</h2>
-              <p>Danh sách mã băm khóa công khai (fingerprints) của các máy chủ đã được xác thực an toàn.</p>
-            </div>
-          )}
+          {activeSubTab === 'known-hosts' && (() => {
+            return (
+              <div className="known-hosts-container">
+                <div className="known-hosts-header">
+                  <ShieldCheck size={22} />
+                  <div>
+                    <h3>Known Hosts</h3>
+                    <p>Fingerprints của SSH server đã xác thực (Trust On First Use). Kết nối lần đầu sẽ lưu tự động.</p>
+                  </div>
+                </div>
+
+                {knownHostsList.length === 0 ? (
+                  <div className="known-hosts-empty">
+                    <ShieldCheck size={52} />
+                    <p>Chưa có máy chủ nào được ghi nhận</p>
+                    <small>Fingerprint sẽ được lưu tự động khi bạn kết nối SSH lần đầu đến một server mới.</small>
+                  </div>
+                ) : (
+                  <div className="known-hosts-list">
+                    {knownHostsList.map(({ hostPort, fingerprint }) => {
+                      const [h, p] = hostPort.split(':');
+                      return (
+                        <div key={hostPort} className="known-host-item">
+                          <div className="known-host-info">
+                            <div className="known-host-address">
+                              <Server size={14} />
+                              <span>{h}</span>
+                              <span className="known-host-port">:{p}</span>
+                            </div>
+                            <div className="known-host-fingerprint">
+                              <span className="known-host-keytype">{getKeyType(fingerprint)}</span>
+                              <code>{abbreviate(fingerprint)}</code>
+                            </div>
+                          </div>
+                          <button
+                            className="known-host-delete-btn"
+                            onClick={() => handleForgetHost(hostPort)}
+                            title="Xóa khỏi danh sách tin cậy"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {activeSubTab === 'logs' && (
             <div className="simulated-view-container">
@@ -896,46 +1021,44 @@ export default function HostsDashboard({
       {isPaneOpen && (
         <div className="dashboard-details-pane">
           <>
-            <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', paddingBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h3 style={{ margin: 0 }}>{isNewHostMode ? 'New Host' : 'Host Details'}</h3>
-                
+            <div className="pane-header flex justify-between items-center border-b border-white/5 pb-3">
+              <div className="flex items-center gap-2">
+                <h3 className="m-0">{isNewHostMode ? 'New Host' : 'Host Details'}</h3>
+
                 {/* Nút bấm nhanh CONNECT & SAVE ở trên đầu để tiện sử dụng */}
-                <button 
-                  type="button" 
-                  className="pane-save-btn-top"
+                <button
+                  type="button"
+                  className="pane-save-btn-top px-2.5 py-1 text-[11px] bg-white/[0.08] text-[var(--text-main)] border border-white/10 rounded cursor-pointer font-bold"
                   onClick={handleSaveHost}
-                  style={{ padding: '4px 10px', fontSize: '11px', background: 'rgba(255,255,255,0.08)', color: 'var(--text-main)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
                 >
                   Save
                 </button>
-                
+
                 {!isNewHostMode && (
-                  <button 
-                    type="button" 
-                    className="pane-connect-btn-top"
+                  <button
+                    type="button"
+                    className="pane-connect-btn-top flex items-center gap-1 px-2.5 py-1 text-[11px] bg-[var(--termius-accent)] text-white border-none rounded cursor-pointer font-bold"
                     onClick={handleConnect}
-                    style={{ padding: '4px 10px', fontSize: '11px', background: 'var(--termius-accent)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}
                   >
                     <ExternalLink size={10} /> CONNECT
                   </button>
                 )}
               </div>
-              
-              <button className="pane-close-btn" onClick={handleClosePane} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+
+              <button className="pane-close-btn bg-transparent border-none text-[var(--text-muted)] cursor-pointer" onClick={handleClosePane}>
                 <X size={16} />
               </button>
             </div>
 
             <form className="pane-form connection-form-container" onSubmit={handleSaveHost}>
               {/* Block 1: Host Info (Mạng) - Luôn lên đầu */}
-              <div className="pane-section" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '16px', marginBottom: '16px' }}>
-                <h4 className="section-title" style={{ marginTop: 0, marginBottom: '12px' }}>1. Host Connection (Địa chỉ)</h4>
-                
-                <div className="form-group" style={{ marginBottom: '12px' }}>
+              <div className="pane-section border-b border-white/5 pb-4 mb-4">
+                <h4 className="section-title mt-0 mb-3">1. Host Connection (Địa chỉ)</h4>
+
+                <div className="form-group mb-3">
                   <label>Label (Tên gợi nhớ)</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     placeholder="e.g. Production Server"
                     value={hostLabel}
                     onChange={(e) => setHostLabel(e.target.value)}
@@ -944,10 +1067,10 @@ export default function HostsDashboard({
                     autoFocus
                   />
                 </div>
-                <div className="form-group" style={{ marginBottom: '12px' }}>
+                <div className="form-group mb-3">
                   <label>Host Address (IP/Hostname)</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     placeholder="e.g. 192.168.1.100"
                     value={hostAddress}
                     onChange={(e) => setHostAddress(e.target.value)}
@@ -955,10 +1078,10 @@ export default function HostsDashboard({
                     id="input-conn-host"
                   />
                 </div>
-                <div className="form-group" style={{ marginBottom: '12px' }}>
+                <div className="form-group mb-3">
                   <label>SSH Port</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     placeholder="22"
                     value={hostPort}
                     onChange={(e) => setHostPort(e.target.value)}
@@ -968,16 +1091,16 @@ export default function HostsDashboard({
               </div>
 
               {/* Block 2: Credentials (Xác thực) */}
-              <div className="pane-section" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '16px', marginBottom: '16px' }}>
-                <h4 className="section-title" style={{ marginTop: 0, marginBottom: '12px' }}>2. Credentials (Xác thực)</h4>
-                
-                <div className="form-group animate-fade-in" style={{ marginBottom: '12px' }}>
-                  <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="pane-section border-b border-white/5 pb-4 mb-4">
+                <h4 className="section-title mt-0 mb-3">2. Credentials (Xác thực)</h4>
+
+                <div className="form-group animate-fade-in mb-3">
+                  <label className="flex justify-between items-center">
                     Credentials Identity (Định danh tập trung)
-                    <span style={{ fontSize: '10px', color: 'var(--termius-accent)', fontWeight: 'bold' }}>Termius Style</span>
+                    <span className="text-[10px] text-[var(--termius-accent)] font-bold">Termius Style</span>
                   </label>
-                  <select 
-                    value={hostIdentityId} 
+                  <select
+                    value={hostIdentityId}
                     onChange={(e) => {
                       setHostIdentityId(e.target.value);
                       if (e.target.value !== '') {
@@ -996,8 +1119,7 @@ export default function HostsDashboard({
                       }
                     }}
                     id="select-conn-identity"
-                    className="key-select-dropdown"
-                    style={{ background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', border: '1px solid rgba(255, 255, 255, 0.1)', cursor: 'pointer' }}
+                    className="key-select-dropdown bg-white/5 text-[var(--text-main)] border border-white/10 cursor-pointer"
                   >
                     <option value="">-- Nhập thông tin đăng nhập thủ công --</option>
                     {identities.map(i => (
@@ -1006,33 +1128,33 @@ export default function HostsDashboard({
                   </select>
                 </div>
 
-                <div className="form-group" style={{ marginBottom: '12px' }}>
+                <div className="form-group mb-3">
                   <label>Username</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     placeholder="ubuntu"
                     value={hostUsername}
                     onChange={(e) => setHostUsername(e.target.value)}
                     id="input-conn-username"
                     disabled={hostIdentityId !== ''}
-                    style={hostIdentityId !== '' ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                    className={hostIdentityId !== '' ? 'opacity-50 cursor-not-allowed' : ''}
                   />
                 </div>
 
-                <div className="form-group" style={{ marginBottom: '12px' }}>
+                <div className="form-group mb-3">
                   <label>Password (Không bắt buộc)</label>
                   <div className="password-input-wrapper">
-                    <input 
+                    <input
                       type={showPassword ? 'text' : 'password'}
                       placeholder={hostIdentityId !== '' ? "Được quản lý bởi Identity" : "Leave blank for key auth"}
                       value={hostPassword}
                       onChange={(e) => setHostPassword(e.target.value)}
                       id="input-conn-password"
                       disabled={hostIdentityId !== ''}
-                      style={hostIdentityId !== '' ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                      className={hostIdentityId !== '' ? 'opacity-50 cursor-not-allowed' : ''}
                     />
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       className="password-toggle-btn"
                       onClick={() => setShowPassword(!showPassword)}
                       disabled={hostIdentityId !== ''}
@@ -1042,26 +1164,24 @@ export default function HostsDashboard({
                   </div>
                 </div>
 
-                <div className="form-group" style={{ marginBottom: '12px' }}>
-                  <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="form-group mb-3">
+                  <label className="flex justify-between items-center">
                     Linked Private Key
-                    <button 
-                      type="button" 
-                      className="create-key-fast-btn" 
+                    <button
+                      type="button"
                       onClick={handleAddKeyFromPane}
                       disabled={hostIdentityId !== ''}
-                      style={hostIdentityId !== '' ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                      className={hostIdentityId !== '' ? 'create-key-fast-btn opacity-50 cursor-not-allowed' : 'create-key-fast-btn'}
                     >
                       + Add Key
                     </button>
                   </label>
-                  <select 
-                    value={hostKeyId} 
+                  <select
+                    value={hostKeyId}
                     onChange={(e) => setHostKeyId(e.target.value)}
                     id="select-conn-key"
-                    className="key-select-dropdown"
+                    className={`key-select-dropdown${hostIdentityId !== '' ? ' opacity-50 cursor-not-allowed' : ''}`}
                     disabled={hostIdentityId !== ''}
-                    style={hostIdentityId !== '' ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                   >
                     <option value="">-- Sử dụng Mật khẩu hoặc Mặc định --</option>
                     {keys.map(k => (
@@ -1071,20 +1191,20 @@ export default function HostsDashboard({
                 </div>
 
                 {hostIdentityId !== '' && (
-                  <div style={{ fontSize: '11px', color: 'var(--termius-accent)', marginTop: '8px', padding: '6px 10px', background: 'rgba(0,126,255,0.05)', borderRadius: '4px', border: '1px solid rgba(0,126,255,0.1)' }}>
+                  <div className="text-[11px] text-[var(--termius-accent)] mt-2 px-2.5 py-1.5 bg-blue-500/5 rounded border border-blue-500/10">
                     ℹ️ Thông tin xác thực được quản lý tập trung bởi Identity được chọn.
                   </div>
                 )}
               </div>
 
               {/* Block 3: Phân loại */}
-              <div className="pane-section" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '16px', marginBottom: '16px' }}>
-                <h4 className="section-title" style={{ marginTop: 0, marginBottom: '12px' }}>3. Categorization (Phân loại)</h4>
-                
-                <div className="form-group" style={{ marginBottom: '12px' }}>
+              <div className="pane-section border-b border-white/5 pb-4 mb-4">
+                <h4 className="section-title mt-0 mb-3">3. Categorization (Phân loại)</h4>
+
+                <div className="form-group mb-3">
                   <label>Group Folder</label>
                   {!showCustomGroupInput ? (
-                    <select 
+                    <select
                       value={selectedGroup}
                       onChange={(e) => {
                         if (e.target.value === '__new_group__') {
@@ -1094,36 +1214,34 @@ export default function HostsDashboard({
                         }
                       }}
                       id="select-conn-group"
-                      className="key-select-dropdown"
-                      style={{ cursor: 'pointer' }}
+                      className="key-select-dropdown cursor-pointer"
                     >
                       {existingGroups.map(g => (
                         <option key={g} value={g}>{g}</option>
                       ))}
-                      <option value="__new_group__" style={{ color: 'var(--termius-accent)', fontWeight: 'bold' }}>
+                      <option value="__new_group__" className="text-[var(--termius-accent)] font-bold">
                         [+ Tạo nhóm mới...]
                       </option>
                     </select>
                   ) : (
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input 
-                        type="text" 
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
                         placeholder="Tên nhóm mới..."
                         value={customGroupValue}
                         onChange={(e) => setCustomGroupValue(e.target.value)}
                         required
                         id="input-conn-group-custom"
                         autoFocus
-                        style={{ flexGrow: 1 }}
+                        className="flex-1"
                       />
-                      <button 
-                        type="button" 
-                        className="file-upload-btn-secondary"
+                      <button
+                        type="button"
+                        className="file-upload-btn-secondary h-[38px] w-[38px] justify-center"
                         onClick={() => {
                           setShowCustomGroupInput(false);
                           setSelectedGroup(existingGroups[0] || 'Servers');
                         }}
-                        style={{ height: '38px', width: '38px', justifyContent: 'center' }}
                       >
                         ✕
                       </button>
@@ -1133,8 +1251,8 @@ export default function HostsDashboard({
 
                 <div className="form-group">
                   <label>Tags (Phân tách bằng dấu phẩy)</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     placeholder="ssh, production, gateway"
                     value={hostTags}
                     onChange={(e) => setHostTags(e.target.value)}
@@ -1143,29 +1261,22 @@ export default function HostsDashboard({
                 </div>
 
                 {/* Toggle mở kèm SFTP */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderTop: '1px solid rgba(255,255,255,0.05)', marginTop: '8px' }}>
+                <div className="flex items-center justify-between py-2.5 border-t border-white/5 mt-2">
                   <div>
-                    <div style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-main)' }}>Mở kèm SFTP Explorer</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Tự động hiển SFTP khi kết nối</div>
+                    <div className="text-[13px] font-medium text-[var(--text-main)]">Mở kèm SFTP Explorer</div>
+                    <div className="text-[11px] text-[var(--text-muted)] mt-0.5">Tự động hiển SFTP khi kết nối</div>
                   </div>
                   <button
                     type="button"
                     id="toggle-open-with-sftp"
                     onClick={() => setHostOpenWithSFTP(v => !v)}
-                    style={{
-                      width: '44px', height: '24px', borderRadius: '12px',
-                      background: hostOpenWithSFTP ? 'var(--termius-accent)' : 'rgba(255,255,255,0.1)',
-                      border: 'none', cursor: 'pointer', position: 'relative',
-                      transition: 'background 0.2s ease', flexShrink: 0
-                    }}
+                    className="relative shrink-0 w-11 h-6 rounded-full border-none cursor-pointer transition-colors duration-200"
+                    style={{ background: hostOpenWithSFTP ? 'var(--termius-accent)' : 'rgba(255,255,255,0.1)' }}
                   >
-                    <span style={{
-                      position: 'absolute', top: '3px',
-                      left: hostOpenWithSFTP ? '23px' : '3px',
-                      width: '18px', height: '18px', borderRadius: '50%',
-                      background: 'white', transition: 'left 0.2s ease',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
-                    }} />
+                    <span
+                      className="absolute top-[3px] w-[18px] h-[18px] rounded-full bg-white shadow-sm transition-all duration-200"
+                      style={{ left: hostOpenWithSFTP ? '23px' : '3px' }}
+                    />
                   </button>
                 </div>
               </div>
@@ -1173,7 +1284,7 @@ export default function HostsDashboard({
               {/* Block 4: Advanced Features (Simulated) */}
               <div className="pane-section border-top">
                 <h4 className="section-title">Advanced Settings</h4>
-                
+
                 <div className="advanced-sim-item">
                   <div className="sim-item-left">
                     <span className="sim-title">Agent Forwarding</span>
@@ -1206,8 +1317,8 @@ export default function HostsDashboard({
               {/* Actions bottom */}
               <div className="pane-actions-footer">
                 {!isNewHostMode && (
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     className="pane-delete-btn"
                     onClick={handleDeleteHost}
                     title="Xóa Host này"
@@ -1215,18 +1326,18 @@ export default function HostsDashboard({
                     <Trash2 size={16} />
                   </button>
                 )}
-                
+
                 <button type="submit" className="pane-save-btn">
                   Save
                 </button>
 
                 {!isNewHostMode && (
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     className="pane-connect-btn"
                     onClick={handleConnect}
                   >
-                    <ExternalLink size={14} style={{ marginRight: '6px' }} /> CONNECT
+                    <ExternalLink size={14} className="mr-1.5" /> CONNECT
                   </button>
                 )}
               </div>

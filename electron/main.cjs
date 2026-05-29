@@ -4,6 +4,39 @@ const fs = require('fs');
 const { Client } = require('ssh2');
 const pty = require('node-pty');
 
+// Known hosts for TOFU verification
+let knownHosts = {};
+
+// Pending terminal resizes: tabId -> { cols, rows }
+// Lưu resize gửi trước khi shell SSH được mở, apply ngay khi shell ready
+const pendingResizes = {};
+
+function getKnownHostsPath() {
+  return path.join(app.getPath('userData'), 'known_hosts.json');
+}
+
+function loadKnownHosts() {
+  try {
+    const p = getKnownHostsPath();
+    if (fs.existsSync(p)) {
+      knownHosts = JSON.parse(fs.readFileSync(p, 'utf8'));
+    }
+  } catch (_e) {
+    knownHosts = {};
+  }
+}
+
+function saveKnownHosts() {
+  try {
+    fs.writeFileSync(getKnownHostsPath(), JSON.stringify(knownHosts, null, 2));
+  } catch (_e) {}
+}
+
+// Set app name (fixes "Electron" label in dock during development)
+app.name = 'Last SSH';
+// Giữ nguyên userData path để không mất localStorage data cũ
+app.setPath('userData', path.join(app.getPath('appData'), 'last-ssh'));
+
 let mainWindow = null;
 
 // Hỗ trợ nhiều SSH session song song theo tabId
@@ -16,10 +49,12 @@ let activeShellStream = null;
 let activeSFTP = null;
 
 function createWindow() {
+  const iconPath = path.join(__dirname, '../build/icon.png');
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
-    title: "Last SSH Desktop Client",
+    title: 'Last SSH',
+    icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -92,6 +127,7 @@ function cleanupSSH() {
 }
 
 app.whenReady().then(() => {
+  loadKnownHosts();
   createWindow();
 
   app.on('activate', () => {
@@ -130,7 +166,7 @@ ipcMain.on('ssh-connect', (event, profile) => {
   const username = (profile.username || 'ubuntu').trim();
 
   if (!host) {
-    event.reply('ssh-data', `\r\n\x1b[1;31m[Electron SSH Error] Địa chỉ host không được để trống!\x1b[0m\r\n`);
+    event.reply('ssh-data', { tabId, data: `\r\n\x1b[1;31m[Electron SSH Error] Địa chỉ host không được để trống!\x1b[0m\r\n` });
     return;
   }
 
@@ -141,7 +177,26 @@ ipcMain.on('ssh-connect', (event, profile) => {
     readyTimeout: 20000,           // Chờ tối đa 20 giây để kết nối
     keepaliveInterval: 10000,      // Gửi keepalive mỗi 10 giây
     keepaliveCountMax: 5,          // Cho phép tối đa 5 lần keepalive fail
-    hostVerifier: () => true       // Chấp nhận mọi host fingerprint (giống PuTTY mặc định)
+    hostVerifier: (fingerprint) => {
+      const hostKey = `${host}:${connSettings.port}`;
+      // Luôn convert sang base64 string để tránh lỗi Buffer vs Object sau JSON round-trip
+      const fp = Buffer.isBuffer(fingerprint)
+        ? fingerprint.toString('base64')
+        : String(fingerprint);
+
+      if (!knownHosts[hostKey]) {
+        knownHosts[hostKey] = fp;
+        saveKnownHosts();
+        return true;
+      }
+      if (knownHosts[hostKey] !== fp) {
+        if (mainWindow) {
+          mainWindow.webContents.send('ssh-data', { tabId, data: `\r\n\x1b[1;31m[SSH SECURITY WARNING] Fingerprint của ${host} đã thay đổi! Kết nối bị từ chối.\r\nNếu server key hợp lệ đã thay đổi, dùng lệnh: ssh-forget-host ${hostKey}\x1b[0m\r\n` });
+        }
+        return false;
+      }
+      return true;
+    }
   };
 
   // Xác thực bằng Private Key hoặc Password
@@ -158,15 +213,15 @@ ipcMain.on('ssh-connect', (event, profile) => {
   }
 
   const portDisplay = isNaN(port) ? 22 : port;
-  event.reply('ssh-data', `\r\n\x1b[1;33m[Electron SSH] Đang kết nối đến máy chủ thực ${username}@${host}:${portDisplay}...\x1b[0m\r\n`);
+  event.reply('ssh-data', { tabId, data: `\r\n\x1b[1;33m[Electron SSH] Đang kết nối đến máy chủ thực ${username}@${host}:${portDisplay}...\x1b[0m\r\n` });
 
   client.on('ready', () => {
-    event.reply('ssh-data', `\x1b[1;32m[Electron SSH] Xác thực thành công! Đang thiết lập terminal shell...\x1b[0m\r\n`);
+    event.reply('ssh-data', { tabId, data: `\x1b[1;32m[Electron SSH] Xác thực thành công! Đang thiết lập terminal shell...\x1b[0m\r\n` });
 
     // Mở shell tương tác (dùng kích thước nhỏ mặc định, renderer sẽ gửi resize thật ngay sau)
     client.shell({ term: 'xterm-256color', rows: 24, cols: 80 }, (err, stream) => {
       if (err) {
-        event.reply('ssh-data', `\r\n\x1b[1;31m[Electron SSH Error] Không thể mở shell: ${err.message}\x1b[0m\r\n`);
+        event.reply('ssh-data', { tabId, data: `\r\n\x1b[1;31m[Electron SSH Error] Không thể mở shell: ${err.message}\x1b[0m\r\n` });
         cleanupSession(tabId);
         return;
       }
@@ -174,23 +229,32 @@ ipcMain.on('ssh-connect', (event, profile) => {
       sshSessions[tabId].stream = stream;
       activeShellStream = stream;
 
+      // Apply pending resize nếu renderer đã gửi resize trước khi shell mở xong
+      if (pendingResizes[tabId]) {
+        const { cols, rows } = pendingResizes[tabId];
+        delete pendingResizes[tabId];
+        if (cols > 0 && rows > 0) {
+          try { stream.setWindow(rows, cols, 0, 0); } catch (_e) {}
+        }
+      }
+
       // Pipe luồng nhận dữ liệu từ shell gửi lên React
       stream.on('data', (data) => {
         if (mainWindow) {
-          mainWindow.webContents.send('ssh-data', data.toString());
+          mainWindow.webContents.send('ssh-data', { tabId, data: data.toString() });
         }
       });
 
       stream.stderr.on('data', (data) => {
         if (mainWindow) {
-          mainWindow.webContents.send('ssh-data', data.toString());
+          mainWindow.webContents.send('ssh-data', { tabId, data: data.toString() });
         }
       });
 
       stream.on('close', () => {
         if (mainWindow) {
-          mainWindow.webContents.send('ssh-data', `\r\n\x1b[1;30m[Electron SSH] Kết nối đã bị đóng bởi máy chủ.\x1b[0m\r\n`);
-          mainWindow.webContents.send('ssh-close');
+          mainWindow.webContents.send('ssh-data', { tabId, data: `\r\n\x1b[1;30m[Electron SSH] Kết nối đã bị đóng bởi máy chủ.\x1b[0m\r\n` });
+          mainWindow.webContents.send('ssh-close', tabId);
         }
         cleanupSession(tabId);
       });
@@ -231,9 +295,9 @@ ipcMain.on('ssh-connect', (event, profile) => {
     }
 
     if (mainWindow) {
-      mainWindow.webContents.send('ssh-data', `\r\n\x1b[1;31m[Electron SSH Connection Error] ${errorMsg}${hint}\x1b[0m\r\n`);
+      mainWindow.webContents.send('ssh-data', { tabId, data: `\r\n\x1b[1;31m[Electron SSH Connection Error] ${errorMsg}${hint}\x1b[0m\r\n` });
     } else {
-      event.reply('ssh-data', `\r\n\x1b[1;31m[Electron SSH Connection Error] ${errorMsg}${hint}\x1b[0m\r\n`);
+      event.reply('ssh-data', { tabId, data: `\r\n\x1b[1;31m[Electron SSH Connection Error] ${errorMsg}${hint}\x1b[0m\r\n` });
     }
     cleanupSession(tabId);
   });
@@ -245,11 +309,12 @@ ipcMain.on('ssh-connect', (event, profile) => {
   client.connect(connSettings);
 });
 
-// Ghi dữ liệu gõ phím xuống Shell (dùng stream mới nhất)
-ipcMain.on('ssh-write', (event, data) => {
-  if (activeShellStream) {
+// Ghi dữ liệu gõ phím xuống Shell (dùng đúng stream theo tabId)
+ipcMain.on('ssh-write', (event, { tabId, data }) => {
+  const session = sshSessions[tabId];
+  if (session && session.stream) {
     try {
-      activeShellStream.write(data);
+      session.stream.write(data);
     } catch (_e) {
       console.error('Lỗi ghi dữ liệu SSH:', _e.message);
     }
@@ -259,6 +324,30 @@ ipcMain.on('ssh-write', (event, data) => {
 // Ngắt kết nối SSH theo tabId
 ipcMain.on('ssh-disconnect', (event, tabId) => {
   cleanupSession(tabId || 'default');
+});
+
+// Resize SSH PTY window theo tabId (cần cho htop/vim/top)
+ipcMain.on('ssh-resize', (event, { tabId, cols, rows }) => {
+  if (!tabId || cols <= 0 || rows <= 0) return;
+  const session = sshSessions[tabId];
+  const stream = session ? session.stream : null;
+  if (stream) {
+    try { stream.setWindow(rows, cols, 0, 0); } catch (_e) {}
+  } else {
+    // Shell chưa mở — lưu lại, sẽ apply ngay khi shell ready
+    pendingResizes[tabId] = { cols, rows };
+  }
+});
+
+// Xóa host khỏi known_hosts (cho phép kết nối lại sau khi server key hợp lệ thay đổi)
+ipcMain.handle('ssh-forget-host', (event, hostPort) => {
+  delete knownHosts[hostPort];
+  saveKnownHosts();
+  return true;
+});
+
+ipcMain.handle('ssh-get-known-hosts', () => {
+  return { ...knownHosts };
 });
 
 ipcMain.on('local-shell-connect', (event, { tabId, cwd, shell }) => {

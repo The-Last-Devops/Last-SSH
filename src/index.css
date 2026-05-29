@@ -1,3 +1,35 @@
+/* Tailwind CSS v4 */
+@import "tailwindcss";
+
+/* Map CSS theme variables → Tailwind utilities */
+@theme inline {
+  --color-accent:       var(--accent);
+  --color-text-main:    var(--text-main);
+  --color-text-muted:   var(--text-muted);
+  --color-text-bright:  var(--text-bright);
+  --color-panel:        var(--panel-bg);
+  --color-border:       var(--border-color);
+  --color-term-green:   var(--term-green);
+  --color-term-red:     var(--term-red);
+  --color-term-yellow:  var(--term-yellow);
+  --color-term-cyan:    var(--term-cyan);
+  --color-term-blue:    var(--term-blue);
+
+  /* Termius dashboard colors */
+  --color-dash-bg:      var(--termius-dark-bg, #1a1b26);
+  --color-dash-card:    var(--termius-dark-card, #1f2335);
+  --color-dash-sidebar: var(--termius-dark-sidebar, #16161e);
+
+  /* Spacing */
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+}
+
 /* import Google Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Source+Code+Pro:wght@400;500;700&display=swap');
 
@@ -5,61 +37,59 @@
    DESIGN SYSTEM - THEME VARIABLES (HSL Tailored)
    ========================================================================== */
 
-/* 1. Theme: Dark (Theme Tối - Mặc định chuyên nghiệp) */
+/* 1. Theme: Dark (Tokyo Night — tương tự Termius Dark) */
 .theme-dark {
-  --bg-gradient: radial-gradient(circle, #1f1f1f 0%, #181818 100%);
-  --panel-bg: rgba(30, 30, 30, 0.85);
-  --sidebar-bg: #181818;
-  --border-color: #2b2b2b;
-  --border-highlight: rgba(0, 122, 204, 0.45);
-  
-  --text-main: #cccccc;
-  --text-muted: #8c8c8c;
-  --text-bright: #ffffff;
-  
-  --accent: #007acc;
-  --accent-rgb: 0, 122, 204;
-  --accent-glow: rgba(0, 122, 204, 0.35);
-  
-  --terminal-bg: #1e1e1e;
-  --terminal-cursor: #aeafad;
-  
-  /* Màu log Terminal sẫm sắc nét trên nền tối */
-  --term-blue: #2472c8;
-  --term-green: #0dbc79;
-  --term-yellow: #e5e510;
-  --term-red: #cd3131;
-  --term-magenta: #bc3fbc;
-  --term-cyan: #11a8cd;
+  --bg-gradient: linear-gradient(160deg, #1a1b26 0%, #16161e 100%);
+  --panel-bg: rgba(26, 27, 38, 0.98);
+  --sidebar-bg: #16161e;
+  --border-color: rgba(255, 255, 255, 0.07);
+  --border-highlight: rgba(122, 162, 247, 0.5);
+
+  --text-main: #c0caf5;
+  --text-muted: #565f89;
+  --text-bright: #e0e0f0;
+
+  --accent: #7aa2f7;
+  --accent-rgb: 122, 162, 247;
+  --accent-glow: rgba(122, 162, 247, 0.25);
+
+  --terminal-bg: #1a1b26;
+  --terminal-cursor: #c0caf5;
+
+  --term-blue: #7aa2f7;
+  --term-green: #9ece6a;
+  --term-yellow: #e0af68;
+  --term-red: #f7768e;
+  --term-magenta: #bb9af7;
+  --term-cyan: #7dcfff;
 }
 
-/* 2. Theme: Light (Theme Sáng - Tương phản cực cao sắc nét) */
+/* 2. Theme: Light (Termius-inspired — sạch, tương phản cao) */
 .theme-light {
   color-scheme: light !important;
-  --bg-gradient: linear-gradient(135deg, #f6f8fa 0%, #e1e4e8 100%);
-  --panel-bg: rgba(255, 255, 255, 0.95);
+  --bg-gradient: #f5f5f7;
+  --panel-bg: rgba(255, 255, 255, 0.98);
   --sidebar-bg: #ffffff;
-  --border-color: rgba(27, 31, 36, 0.15);
-  --border-highlight: rgba(0, 95, 184, 0.35);
-  
-  --text-main: #1f2328;
-  --text-muted: #57606a;
+  --border-color: rgba(0, 0, 0, 0.08);
+  --border-highlight: rgba(37, 99, 235, 0.4);
+
+  --text-main: #1d1d1f;
+  --text-muted: #6b7280;
   --text-bright: #000000;
-  
-  --accent: #005fb8;
-  --accent-rgb: 0, 95, 184;
-  --accent-glow: rgba(0, 95, 184, 0.15);
-  
-  --terminal-bg: #fafafa;
-  --terminal-cursor: #005fb8;
-  
-  /* Màu log Terminal có độ tương phản cao sắc nét tuyệt đối trên nền sáng */
-  --term-blue: #0969da;
-  --term-green: #1a7f37;
-  --term-yellow: #9a6700;
-  --term-red: #cf222e;
-  --term-magenta: #8250df;
-  --term-cyan: #0598bc;
+
+  --accent: #2563eb;
+  --accent-rgb: 37, 99, 235;
+  --accent-glow: rgba(37, 99, 235, 0.12);
+
+  --terminal-bg: #282a36;
+  --terminal-cursor: #f8f8f2;
+
+  --term-blue: #7aa2f7;
+  --term-green: #9ece6a;
+  --term-yellow: #e0af68;
+  --term-red: #f7768e;
+  --term-magenta: #bb9af7;
+  --term-cyan: #7dcfff;
 }
 
 /* Tối ưu hóa scanlines CRT trên nền sáng màu để giữ độ tương phản tốt nhất cho chữ */
@@ -69,6 +99,28 @@
   opacity: 0.5;
 }
 
+
+/* ==========================================================================
+   DESIGN TOKENS — Spacing, Radius, Shadow scale
+   ========================================================================== */
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
 
 /* ==========================================================================
    GLOBAL CONFIG & RESET
@@ -82,7 +134,7 @@
 }
 
 html {
-  background-color: #0d0a15;
+  background-color: #16161e;
   color-scheme: dark !important;
 }
 
@@ -92,12 +144,23 @@ body {
   height: 100vh;
   width: 100vw;
   background: var(--bg-gradient);
-  background-color: #0d0a15;
+  background-color: #16161e;
   color: var(--text-main);
   color-scheme: dark !important;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background 0.5s ease;
+}
+
+/* Light theme overrides for html/body */
+body.theme-light {
+  background-color: #f5f5f7 !important;
+  color-scheme: light !important;
+}
+
+html:has(body.theme-light) {
+  background-color: #f5f5f7 !important;
+  color-scheme: light !important;
 }
 
 /* Cho phép chọn văn bản trong Terminal */
@@ -111,7 +174,7 @@ body {
   width: 100vw;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: 6px;
   overflow: hidden;
 }
 
@@ -132,6 +195,11 @@ body {
   overflow: hidden;
   transition: all 0.3s ease;
   position: relative;
+}
+
+.theme-light .glass-container {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+  border-color: rgba(0, 0, 0, 0.08);
 }
 
 .glass-panel {
@@ -335,7 +403,7 @@ body {
    ========================================================================== */
 
 .theme-light .glass-input {
-  background: rgba(0, 0, 0, 0.04);
+  background: #ffffff;
   border-color: rgba(0, 0, 0, 0.12);
   color: var(--text-bright);
   color-scheme: light !important;

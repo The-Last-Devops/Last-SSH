@@ -30,9 +30,6 @@ const STORAGE_KEYS = {
   IDENTITIES_PLAIN: 'terminus_identities_plain'
 };
 
-const generateUniqueId = (prefix) => {
-  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
-};
 
 const savePlainAppState = ({ connections = [], keys = [], identities = [] }) => {
   if (typeof window === 'undefined' || !window.localStorage) return;
@@ -106,7 +103,7 @@ export default function App() {
   // TÁC VỤ QUẢN LÝ TAB (TAB SYSTEM WORKFLOW)
   // -------------------------------------------------------------
   const openNewLocalTab = () => {
-    const tabId = generateUniqueId('tab-local');
+    const tabId = crypto.randomUUID();
     const newTab = {
       id: tabId,
       title: 'Local terminal',
@@ -150,6 +147,15 @@ export default function App() {
     setTabs(prev => prev.map(t => t.id === tabId ? { ...t, title: newTitle } : t));
   };
 
+  const handleReorderTabs = (fromIndex, toIndex) => {
+    setTabs(prev => {
+      const result = [...prev];
+      const [removed] = result.splice(fromIndex, 1);
+      result.splice(toIndex, 0, removed);
+      return result;
+    });
+  };
+
   const handleUpdateTab = (tabId, updatedFields) => {
     setTabs(prev => prev.map(t => t.id === tabId ? { ...t, ...updatedFields } : t));
   };
@@ -185,7 +191,7 @@ export default function App() {
       }
     }
 
-    const tabId = generateUniqueId('tab-ssh');
+    const tabId = crypto.randomUUID();
     resolvedProfile.tabId = tabId; // Truyền tabId để Electron quản lý session
 
     const isDesktop = typeof window !== 'undefined' && window.electronAPI !== undefined;
@@ -204,7 +210,7 @@ export default function App() {
 
     const newTab = {
       id: tabId,
-      title: `ssh: ${resolvedProfile.host}`,
+      title: `ssh: ${resolvedProfile.label || resolvedProfile.host}`,
       type: 'ssh',
       currentPath: `/home/${resolvedProfile.username || 'ubuntu'}`,
       history: initialHistory,
@@ -258,7 +264,7 @@ export default function App() {
 
   // Thêm kết nối SSH mới
   const handleAddConnection = async (newProfile) => {
-    const profile = { ...newProfile, id: generateUniqueId('conn') };
+    const profile = { ...newProfile, id: crypto.randomUUID() };
     const updated = [...connections, profile];
     setConnections(updated);
 
@@ -285,7 +291,7 @@ export default function App() {
   // TÁC VỤ QUẢN LÝ SSH PRIVATE KEYS (SSH PRIVATE KEYS WORKFLOW)
   // -------------------------------------------------------------
   const handleAddKey = async (newKey) => {
-    const keyProfile = { ...newKey, id: generateUniqueId('key') };
+    const keyProfile = { ...newKey, id: crypto.randomUUID() };
     const currentKeys = Array.isArray(keys) ? keys : [];
     const updated = [...currentKeys, keyProfile];
     setKeys(updated);
@@ -304,34 +310,27 @@ export default function App() {
   const handleDeleteKey = async (id) => {
     const currentConns = Array.isArray(connections) ? connections : [];
     const updatedConns = currentConns.map(c => c.keyId === id ? { ...c, keyId: '' } : c);
-    if (JSON.stringify(updatedConns) !== JSON.stringify(connections)) {
-      setConnections(updatedConns);
-      await persistAppState({ connections: updatedConns });
-    }
+    const connsChanged = updatedConns.some((c, i) => c !== currentConns[i]);
+
+    if (connsChanged) setConnections(updatedConns);
 
     const currentKeys = Array.isArray(keys) ? keys : [];
-    const updated = currentKeys.filter(k => k.id !== id);
-    setKeys(updated);
+    const updatedKeys = currentKeys.filter(k => k.id !== id);
+    setKeys(updatedKeys);
 
-    await persistAppState({ keys: updated });
+    await persistAppState({
+      connections: connsChanged ? updatedConns : currentConns,
+      keys: updatedKeys
+    });
   };
 
   // -------------------------------------------------------------
   // TÁC VỤ QUẢN LÝ SSH IDENTITIES (SSH IDENTITIES WORKFLOW)
   // -------------------------------------------------------------
   const handleAddIdentity = async (newIdentity) => {
-    const identityProfile = { ...newIdentity, id: generateUniqueId('identity') };
+    const identityProfile = { ...newIdentity, id: crypto.randomUUID() };
     const currentIdentities = Array.isArray(identities) ? identities : [];
     const updated = [...currentIdentities, identityProfile];
-    setIdentities(updated);
-
-    await persistAppState({ identities: updated });
-  };
-
-  // eslint-disable-next-line no-unused-vars
-  const handleEditIdentity = async (id, updatedIdentity) => {
-    const currentIdentities = Array.isArray(identities) ? identities : [];
-    const updated = currentIdentities.map(i => i.id === id ? { ...i, ...updatedIdentity } : i);
     setIdentities(updated);
 
     await persistAppState({ identities: updated });
@@ -340,16 +339,18 @@ export default function App() {
   const handleDeleteIdentity = async (id) => {
     const currentConns = Array.isArray(connections) ? connections : [];
     const updatedConns = currentConns.map(c => c.identityId === id ? { ...c, identityId: '' } : c);
-    if (JSON.stringify(updatedConns) !== JSON.stringify(connections)) {
-      setConnections(updatedConns);
-      await persistAppState({ connections: updatedConns });
-    }
+    const connsChanged = updatedConns.some((c, i) => c !== currentConns[i]);
+
+    if (connsChanged) setConnections(updatedConns);
 
     const currentIdentities = Array.isArray(identities) ? identities : [];
-    const updated = currentIdentities.filter(i => i.id !== id);
-    setIdentities(updated);
+    const updatedIdentities = currentIdentities.filter(i => i.id !== id);
+    setIdentities(updatedIdentities);
 
-    await persistAppState({ identities: updated });
+    await persistAppState({
+      connections: connsChanged ? updatedConns : currentConns,
+      identities: updatedIdentities
+    });
   };
 
   // -------------------------------------------------------------
@@ -564,24 +565,24 @@ export default function App() {
 
       {/* 2. Giao diện làm việc chính của ứng dụng */}
       {!isLocked && (
-        <div 
-          className="app-container"
-          style={{ '--sidebar-width': '0px' }}
+        <div
+          className="flex w-full h-full overflow-hidden relative"
         >
           {/* Khung chính bên phải: MainContent */}
-          <div className="main-content">
-            
+          <div className="flex-1 min-h-0 h-full flex flex-col overflow-hidden relative bg-black/5">
+
             {/* Header: chứa TabsBar quản lý tab và các điều khiển Settings/Sync toàn cục */}
-            <div className="header-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-              <TabsBar 
+            <div className="h-12 w-full border-b border-border flex items-center justify-between shrink-0 bg-black/[0.12] theme-light:bg-white/95">
+              <TabsBar
                 tabs={tabs}
                 activeTabId={activeTabId}
                 onSelectTab={handleSelectTab}
                 onCloseTab={handleCloseTab}
                 onRenameTab={handleRenameTab}
+                onReorderTabs={handleReorderTabs}
                 onNewTab={openNewLocalTab}
               />
-              <div className="header-actions" style={{ display: 'flex', gap: '8px', paddingRight: '12px' }}>
+              <div className="flex gap-2 pr-3">
                 {/* Nút toggle SFTP - chỉ hiện khi đang ở tab SSH */}
                 {activeTab && activeTab.type === 'ssh' && (
                   <button 
@@ -624,9 +625,10 @@ export default function App() {
             </div>
 
             {/* Content: Hiển thị Terminal và SFTP Browser Split Pane HOẶC Hosts Dashboard */}
-            <div className="content-frame">
-              {activeTabId === 'hosts-dashboard' ? (
-                <HostsDashboard 
+            <div className="min-h-0 min-w-0 flex-1 w-full flex overflow-hidden relative">
+              {/* Hosts Dashboard — chỉ render khi active */}
+              {activeTabId === 'hosts-dashboard' && (
+                <HostsDashboard
                   connections={connections}
                   keys={keys}
                   identities={identities}
@@ -640,39 +642,41 @@ export default function App() {
                   onAddIdentity={handleAddIdentity}
                   onDeleteIdentity={handleDeleteIdentity}
                 />
-              ) : (
-                activeTab && (
-                  <div className="split-pane">
-                    
-                    {/* Cửa sổ Terminal Tab */}
-                    <div className="terminal-pane">
-                      <TerminalTab 
-                        tab={activeTab}
+              )}
+
+              {/* Tất cả terminal tabs luôn mounted — chỉ ẩn/hiện bằng CSS
+                  Tránh reconnect SSH khi switch tab */}
+              {tabs.map(tab => {
+                const isActive = tab.id === activeTabId;
+                const isSftpTabOpen = isSftpOpenMap[tab.id] && tab.type === 'ssh';
+                return (
+                  <div
+                    key={tab.id}
+                    className="flex w-full h-full overflow-hidden min-h-0 min-w-0"
+                    style={{ display: isActive ? 'flex' : 'none' }}
+                  >
+                    <div className="flex-1 min-h-0 min-w-0 h-full overflow-hidden relative transition-all duration-300">
+                      <TerminalTab
+                        tab={tab}
                         settings={settings}
                         onUpdateTab={handleUpdateTab}
                         onCloseTab={handleCloseTab}
                         onSwitchToSFTP={handleSwitchToSFTP}
                       />
                     </div>
-
-                    {/* Cửa sổ visual SFTP (Chỉ hiện khi ở kết nối SSH và toggle bật) */}
-                    {isSftpOpen && (
-                      <div className="sftp-pane">
-                        <SFTPBrowser 
-                          tabId={activeTab.id}
-                          currentPath={activeTab.currentPath}
-                          onNavigate={(newPath) => {
-                            // Điều hướng SFTP visual đồng bộ cập nhật path trong tab state
-                            handleUpdateTab(activeTab.id, { currentPath: newPath });
-                          }}
-                          onTerminalLog={(msg) => handleSFTPTerminalLog(activeTab.id, msg)}
+                    {isSftpTabOpen && (
+                      <div className="w-[380px] min-h-0 h-full border-l border-border bg-black/20 backdrop-blur-sm shrink-0 overflow-hidden transition-all duration-300">
+                        <SFTPBrowser
+                          tabId={tab.id}
+                          currentPath={tab.currentPath}
+                          onNavigate={(newPath) => handleUpdateTab(tab.id, { currentPath: newPath })}
+                          onTerminalLog={(msg) => handleSFTPTerminalLog(tab.id, msg)}
                         />
                       </div>
                     )}
-
                   </div>
-                )
-              )}
+                );
+              })}
             </div>
 
           </div>
@@ -695,11 +699,13 @@ export default function App() {
       />
 
       {/* 4. Modal đồng bộ dữ liệu P2P WebRTC */}
-      <P2PSyncModal 
+      <P2PSyncModal
         isOpen={isP2PSyncOpen}
         onClose={() => setIsP2PSyncOpen(false)}
         connections={connections}
         settings={settings}
+        keys={keys}
+        identities={identities}
         onSyncComplete={handleImportRestore}
       />
     </div>

@@ -30,6 +30,38 @@ class SecurityService {
     this.activeKeySalt = null; // Salt dùng để tái tạo lại cùng khóa trên phiên sau
   }
 
+  _getAttemptInfo() {
+    try {
+      const stored = window.localStorage.getItem('terminus_pin_attempts');
+      return stored ? JSON.parse(stored) : { count: 0, lockedUntil: 0 };
+    } catch {
+      return { count: 0, lockedUntil: 0 };
+    }
+  }
+
+  _recordFailedAttempt() {
+    const info = this._getAttemptInfo();
+    info.count++;
+    if (info.count >= 5) {
+      const lockoutMs = 30000 * Math.pow(2, info.count - 5);
+      info.lockedUntil = Date.now() + Math.min(lockoutMs, 3600000);
+    }
+    window.localStorage.setItem('terminus_pin_attempts', JSON.stringify(info));
+    return info;
+  }
+
+  _clearAttempts() {
+    window.localStorage.removeItem('terminus_pin_attempts');
+  }
+
+  _checkLockout() {
+    const info = this._getAttemptInfo();
+    if (info.lockedUntil > Date.now()) {
+      const secs = Math.ceil((info.lockedUntil - Date.now()) / 1000);
+      throw new Error(`Quá nhiều lần thử sai. Vui lòng chờ ${secs} giây.`);
+    }
+  }
+
   // Kiểm tra xem người dùng đã thiết lập mã PIN chưa
   hasPIN() {
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -69,6 +101,8 @@ class SecurityService {
 
   // Đăng nhập bằng mã PIN
   async unlockWithPIN(pin) {
+    this._checkLockout();
+
     if (!this.hasPIN()) {
       throw new Error('Ứng dụng chưa được thiết lập mã PIN');
     }
@@ -81,6 +115,7 @@ class SecurityService {
 
       if (!encrypted) {
         // Nếu không có payload, coi như mở khóa thành công dữ liệu trống
+        this._clearAttempts();
         this.isUnlocked = true;
         return {};
       }
@@ -88,9 +123,11 @@ class SecurityService {
       const decryptedString = await this.decrypt(encrypted, pin);
       const decryptedData = JSON.parse(decryptedString);
 
+      this._clearAttempts();
       this.isUnlocked = true;
       return decryptedData;
     } catch (e) {
+      this._recordFailedAttempt();
       throw new Error('Mã PIN không chính xác hoặc dữ liệu bị hỏng', { cause: e });
     }
   }
@@ -129,6 +166,7 @@ class SecurityService {
       window.localStorage.removeItem(PIN_STORE_KEY);
       window.localStorage.removeItem(ENCRYPTED_DATA_KEY);
       window.localStorage.removeItem('terminus_biometrics_credentials');
+      window.localStorage.removeItem('terminus_biometrics_secret');
     }
     this.isUnlocked = true;
     this.activeKey = null;
@@ -158,7 +196,7 @@ class SecurityService {
       {
         name: 'PBKDF2',
         salt: salt,
-        iterations: 100000,
+        iterations: 310000,
         hash: 'SHA-256'
       },
       baseKey,
@@ -302,14 +340,15 @@ class SecurityService {
       
       // Mã hóa mã PIN của ứng dụng bằng một khóa tĩnh ngẫu nhiên chỉ thiết bị này biết,
       // bảo vệ mã PIN bằng thông tin vân tay (simulated client-side key storage).
+      const biometricSecret = bufferToBase64(crypto.getRandomValues(new Uint8Array(32)));
       const secureStore = {
         credentialId: credentialIdBase64,
-        // Chúng ta mã hóa mã PIN để lưu lại an toàn
-        encryptedPin: await this.encrypt(pin, credentialIdBase64)
+        encryptedPin: await this.encrypt(pin, biometricSecret)
       };
 
       if (typeof window !== 'undefined' && window.localStorage) {
         window.localStorage.setItem('terminus_biometrics_credentials', JSON.stringify(secureStore));
+        window.localStorage.setItem('terminus_biometrics_secret', biometricSecret);
       }
 
       return true;
@@ -359,8 +398,12 @@ class SecurityService {
         throw new Error('Xác thực thất bại');
       }
 
-      // Vân tay đúng! Chúng ta tiến hành giải mã mã PIN đã lưu bằng Credential ID
-      const decryptedPin = await this.decrypt(storedCreds.encryptedPin, storedCreds.credentialId);
+      // Vân tay đúng! Chúng ta tiến hành giải mã mã PIN đã lưu bằng biometric secret
+      const biometricSecret = window.localStorage.getItem('terminus_biometrics_secret');
+      if (!biometricSecret) {
+        throw new Error('Dữ liệu sinh trắc học không đầy đủ, vui lòng đăng ký lại vân tay');
+      }
+      const decryptedPin = await this.decrypt(storedCreds.encryptedPin, biometricSecret);
       
       // Sau khi giải mã ra PIN, dùng PIN để mở khóa toàn bộ ứng dụng như bình thường
       return await this.unlockWithPIN(decryptedPin);

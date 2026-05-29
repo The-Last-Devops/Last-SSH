@@ -219,17 +219,18 @@ class P2PService {
   }
 
   // Gửi dữ liệu cấu hình đã mã hóa sang peer bên kia
-  async sendPayload(connectionsList = [], settingsState = {}, pin = '') {
+  async sendPayload(connectionsList = [], settingsState = {}, pin = '', keysList = [], identitiesList = []) {
     if (!this.connection && !this.isMock) {
       throw new Error('Chưa thiết lập kết nối P2P đến thiết bị nào');
     }
 
     try {
-      // 1. Chuần bị payload dữ liệu toàn bộ ứng dụng
       const payload = {
         virtualFS: virtualFS.exportFS(),
         connections: connectionsList,
         settings: settingsState,
+        keys: Array.isArray(keysList) ? keysList : [],
+        identities: Array.isArray(identitiesList) ? identitiesList : [],
         sentAt: new Date().toISOString()
       };
 
@@ -299,10 +300,11 @@ class P2PService {
         throw new Error('Không thể nạp Hệ thống tệp tin ảo nhận được');
       }
 
-      // 2. Trả về cấu hình SSH và Settings để UI cập nhật State React
       return {
         connections: data.connections,
-        settings: data.settings || {}
+        settings: data.settings || {},
+        keys: Array.isArray(data.keys) ? data.keys : [],
+        identities: Array.isArray(data.identities) ? data.identities : []
       };
     } catch (e) {
       throw new Error('Giải mã dữ liệu đồng bộ thất bại. Mã PIN không khớp!', { cause: e });

@@ -274,34 +274,32 @@ export default function SettingsModal({
             <div className="settings-section">
               {/* Tách biệt Theme Pickers */}
               <div className="form-group">
-                <label className="form-label" style={{ color: 'var(--accent)', fontWeight: 600 }}>APPLICATION THEME</label>
+                <label className="form-label text-accent font-semibold">APPLICATION THEME</label>
                 <div className="theme-grid">
                   {themeList.map(t => (
-                    <div 
+                    <div
                       key={`app-${t.name}`}
-                      className={`theme-card ${settings.appTheme === t.name ? 'active' : ''}`}
+                      className={`theme-card ${settings.appTheme === t.name ? 'active' : ''} px-[10px] py-2 min-h-[75px] justify-center`}
                       onClick={() => onUpdateSettings({ appTheme: t.name })}
-                      style={{ padding: '8px 10px', minHeight: '75px', justifyContent: 'center' }}
                     >
-                      <div className="theme-color-preview" style={{ backgroundColor: t.color, width: '14px', height: '14px' }} />
-                      <span className="theme-card-title" style={{ fontSize: '10.5px' }}>{t.name}</span>
+                      <div className="theme-color-preview w-[14px] h-[14px]" style={{ backgroundColor: t.color }} />
+                      <span className="theme-card-title text-[10.5px]">{t.name}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="form-group" style={{ marginTop: '16px' }}>
-                <label className="form-label" style={{ color: 'var(--accent)', fontWeight: 600 }}>TERMINAL WORKSPACE THEME</label>
+              <div className="form-group mt-4">
+                <label className="form-label text-accent font-semibold">TERMINAL WORKSPACE THEME</label>
                 <div className="theme-grid">
                   {themeList.map(t => (
-                    <div 
+                    <div
                       key={`term-${t.name}`}
-                      className={`theme-card ${settings.terminalTheme === t.name ? 'active' : ''}`}
+                      className={`theme-card ${settings.terminalTheme === t.name ? 'active' : ''} px-[10px] py-2 min-h-[75px] justify-center`}
                       onClick={() => onUpdateSettings({ terminalTheme: t.name })}
-                      style={{ padding: '8px 10px', minHeight: '75px', justifyContent: 'center' }}
                     >
-                      <div className="theme-color-preview" style={{ backgroundColor: t.color, width: '14px', height: '14px' }} />
-                      <span className="theme-card-title" style={{ fontSize: '10.5px' }}>{t.name}</span>
+                      <div className="theme-color-preview w-[14px] h-[14px]" style={{ backgroundColor: t.color }} />
+                      <span className="theme-card-title text-[10.5px]">{t.name}</span>
                     </div>
                   ))}
                 </div>
@@ -340,7 +338,7 @@ export default function SettingsModal({
               <div className="form-group">
                 <label className="form-label">Font Size ({settings.fontSize}px)</label>
                 <div className="slider-group">
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>10px</span>
+                  <span className="text-[11px] text-text-muted">10px</span>
                   <input 
                     type="range" 
                     min="10" 
@@ -349,7 +347,7 @@ export default function SettingsModal({
                     value={settings.fontSize}
                     onChange={(e) => onUpdateSettings({ fontSize: parseInt(e.target.value) })}
                   />
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>24px</span>
+                  <span className="text-[11px] text-text-muted">24px</span>
                 </div>
               </div>
 
@@ -376,7 +374,7 @@ export default function SettingsModal({
             <div className="settings-section">
               {/* Form thêm mới Key */}
               <form onSubmit={handleKeySubmit} className="key-setup-form">
-                <span className="form-title" style={{ fontSize: '11.5px', color: 'var(--accent)', fontWeight: 600 }}>ADD NEW PRIVATE KEY</span>
+                <span className="form-title text-[11.5px] text-accent font-semibold">ADD NEW PRIVATE KEY</span>
                 <div className="form-group">
                   <label className="form-label">Key Label / Name</label>
                   <input 
@@ -391,20 +389,19 @@ export default function SettingsModal({
                 </div>
 
                  <div className="form-group">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div className="flex justify-between items-center">
                     <label className="form-label">Private Key Content (PEM Format)</label>
                     <div>
-                      <input 
+                      <input
                         type="file"
                         id="settings-key-file-upload"
-                        style={{ display: 'none' }}
+                        className="hidden"
                         onChange={handleSettingsKeyFileChange}
                         accept=".pem,.key,id_rsa,id_dsa,id_ecdsa,id_ed25519,.*"
                       />
                       <button
                         type="button"
-                        className="glass-button"
-                        style={{ padding: '2px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        className="glass-button px-2 py-0.5 text-[11px] flex items-center gap-1"
                         onClick={() => document.getElementById('settings-key-file-upload').click()}
                         title="Chọn file Private Key từ máy tính"
                       >
@@ -438,14 +435,14 @@ export default function SettingsModal({
                   </div>
                 </div>
 
-                <button type="submit" className="glass-button active" style={{ display: 'flex', gap: '6px', width: 'max-content' }} id="btn-save-key">
+                <button type="submit" className="glass-button active flex gap-1.5 w-max" id="btn-save-key">
                   <Plus size={14} />
                   Save Private Key
                 </button>
               </form>
 
               {/* Danh sách các Key hiện có */}
-              <div className="keys-list-container" style={{ marginTop: '10px' }}>
+              <div className="keys-list-container mt-[10px]">
                 <label className="form-label">SAVED KEYS ({keys.length})</label>
                 {keys.length === 0 ? (
                   <div className="no-keys-placeholder">
@@ -491,23 +488,23 @@ export default function SettingsModal({
                 <div className="settings-section">
                   <div className="settings-toggle-row">
                     <div className="settings-toggle-label-group">
-                      <span className="settings-toggle-title" style={{ color: 'var(--term-green)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span className="settings-toggle-title text-term-green flex items-center gap-1.5">
                         <Unlock size={14} />
                         Bảo mật mã PIN đang được kích hoạt
                       </span>
                       <span className="settings-toggle-desc">Toàn bộ mật khẩu, key máy chủ và hệ tệp tin ảo đã được mã hóa AES-GCM an toàn.</span>
                     </div>
-                    <button className="glass-button" onClick={handleDisablePin} style={{ color: 'var(--term-red)', borderColor: 'rgba(255, 85, 98, 0.2)' }}>
+                    <button className="glass-button text-term-red border-[rgba(255,85,98,0.2)]" onClick={handleDisablePin}>
                       Disable PIN
                     </button>
                   </div>
 
                   {/* Fingerprint WebAuthn Link */}
                   {isBiometricsAvailable && (
-                    <div className="settings-toggle-row" style={{ marginTop: '8px' }}>
+                    <div className="settings-toggle-row mt-2">
                       <div className="settings-toggle-label-group">
-                        <span className="settings-toggle-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Fingerprint size={16} style={{ color: 'var(--accent)' }} />
+                        <span className="settings-toggle-title flex items-center gap-1.5">
+                          <Fingerprint size={16} className="text-accent" />
                           Liên kết Sinh trắc học Hệ điều hành
                         </span>
                         <span className="settings-toggle-desc">Sử dụng cảm biến vân tay Touch ID hoặc Windows Hello để mở khóa nhanh không cần gõ PIN.</span>
@@ -521,8 +518,8 @@ export default function SettingsModal({
               ) : (
                 // Nếu chưa cài PIN
                 <form onSubmit={handleSetupPin} className="settings-section">
-                  <div style={{ color: 'var(--text-muted)', fontSize: '12px', background: 'rgba(255, 85, 98, 0.05)', border: '1px dashed rgba(255, 85, 98, 0.2)', padding: '12px', borderRadius: '8px' }}>
-                    <ShieldAlert size={14} style={{ color: 'var(--term-red)', marginRight: '6px', verticalAlign: 'middle' }} />
+                  <div className="text-text-muted text-xs bg-[rgba(255,85,98,0.05)] border border-dashed border-[rgba(255,85,98,0.2)] p-3 rounded-lg">
+                    <ShieldAlert size={14} className="text-term-red mr-1.5 inline align-middle" />
                     Dữ liệu lưu trữ cấu hình SSH của bạn hiện chưa được mã hóa. Hãy thiết lập một mã PIN để mã hóa an toàn.
                   </div>
 
@@ -557,7 +554,7 @@ export default function SettingsModal({
                     </div>
                   </div>
 
-                  <div className="form-actions" style={{ marginTop: '8px' }}>
+                  <div className="form-actions mt-2">
                     <button type="submit" className="glass-button active">
                       Enable Security PIN
                     </button>
@@ -595,12 +592,12 @@ export default function SettingsModal({
                 </div>
               </div>
 
-              <div className="settings-toggle-row" style={{ border: '1px solid rgba(255, 85, 98, 0.2)', background: 'rgba(255, 85, 98, 0.05)' }}>
+              <div className="settings-toggle-row border border-[rgba(255,85,98,0.2)] bg-[rgba(255,85,98,0.05)]">
                 <div className="settings-toggle-label-group">
-                  <span className="settings-toggle-title" style={{ color: 'var(--term-red)' }}>Đưa về Trạng thái Xuất xưởng</span>
+                  <span className="settings-toggle-title text-term-red">Đưa về Trạng thái Xuất xưởng</span>
                   <span className="settings-toggle-desc">Xóa sạch toàn bộ cấu hình, hệ thống file ảo, SSH key, đưa app về trạng thái rỗng ban đầu.</span>
                 </div>
-                <button className="glass-button" onClick={handleFactoryReset} style={{ color: 'var(--term-red)', borderColor: 'rgba(255, 85, 98, 0.3)', background: 'rgba(255, 85, 98, 0.1)' }}>
+                <button className="glass-button text-term-red border-[rgba(255,85,98,0.3)] bg-[rgba(255,85,98,0.1)]" onClick={handleFactoryReset}>
                   <Trash2 size={14} />
                   Factory Reset
                 </button>
