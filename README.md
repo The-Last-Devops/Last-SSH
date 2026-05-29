@@ -50,23 +50,23 @@ Last SSH supports **peer-to-peer data synchronization** between devices using We
 
 **Step 1 — Open P2P Sync on BOTH devices**
 
-Click the sync icon (🔄) in the top-right corner of the app. Wait 3–5 seconds for the connection to the signaling server. When you see **"Sẵn sàng ghép đôi"** and a QR code appears, the device is ready.
+Go to **Sync Data** in the sidebar. Wait 3–5 seconds for initialization. When the Sync Key appears, the device is ready.
 
-**Step 2 — Pair the two devices**
+**Step 2 — Share the Sync Key**
 
-- **Device A** (sender): Copy the Peer ID shown on screen (format: `xxxx-xxxx-xxxx`)
-- **Device B** (receiver): Paste that Peer ID into the **"Nhập mã ghép đôi"** field and click **"Ghép Đôi Thiết Bị"**
+- **Device A** (sender): Click **"Send Data"** — a Sync Key will be displayed (valid for 5 minutes). Copy and share it with Device B.
+- **Device B** (receiver): Click **"Receive Data"**, paste the Sync Key and click **"Connect & Sync"**.
 
-Both devices will show **"Đã kết nối P2P thành công!"** in green when paired.
+Both devices will show a connected status when paired.
 
 **Step 3 — Transfer data**
 
-- **Device A**: (Optional) set a numeric PIN for encryption, then click **"Gửi Dữ Liệu"**
-- **Device B**: Enter the same PIN if Device A used one, then click **"Áp dụng dữ liệu đồng bộ"**
+- **Device A**: Click **"Send Data to Device"** to push all settings, hosts, keys, and identities to Device B.
+- **Device B**: Data is automatically applied upon receipt.
 
-> **Quick test on one machine:** Open two Last SSH windows, use the Peer ID from window 1 and enter it in window 2.
+> **Quick test on one machine:** Open two Last SSH windows, use the Sync Key from window 1 and enter it in window 2.
 
-> **Troubleshooting:** If the connection fails, check your internet connection and click **"Thử lại kết nối"**. Connections through strict corporate firewalls may need a VPN.
+> **Troubleshooting:** If the connection fails, check your internet connection. Connections through strict corporate firewalls may need a VPN.
 
 ## 🔨 Build Instructions (Packaging the App)
 
