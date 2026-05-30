@@ -3,8 +3,10 @@
 // Tự động mount vào window.webAPI khi import.
 
 function createWebAPI() {
-  // Resolve WebSocket URL từ current host (production) hoặc dev server
-  const wsUrl = (() => {
+  // Resolve WebSocket URL:
+  // 1. VITE_WS_URL env var (Cloudflare Pages / tách frontend-backend)
+  // 2. Same host fallback (Docker / Railway — frontend + backend cùng server)
+  const wsUrl = import.meta.env.VITE_WS_URL || (() => {
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     return `${proto}//${window.location.host}/ws`;
   })();

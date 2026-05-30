@@ -16,7 +16,7 @@ import { storageService } from './services/storageService.js';
 import './App.css';
 
 const DEFAULT_SETTINGS = {
-  appTheme: 'Dark',
+  appTheme: 'Light',
   terminalTheme: 'Dark',
   fontFamily: 'Fira Code',
   fontSize: 14,
@@ -638,8 +638,10 @@ export default function App() {
               className="w-full border-b border-border flex items-center justify-between shrink-0"
               style={{ WebkitAppRegion: 'drag', height: 36 }}
             >
-              {/* Khoảng trống cho traffic lights macOS — 80px để tránh đè lên ● ● ● */}
-              <div style={{ width: 80, flexShrink: 0 }} />
+              {/* Khoảng trống cho traffic lights macOS — chỉ cần khi chạy Electron desktop */}
+              {typeof window !== 'undefined' && !!window.electronAPI && (
+                <div style={{ width: 80, flexShrink: 0 }} />
+              )}
 
               {/* Tabs — vùng trống giữa các tab vẫn drag được window */}
               <div className="flex-1 min-w-0">
