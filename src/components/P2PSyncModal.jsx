@@ -40,6 +40,7 @@ export default function P2PSyncModal({
   const [receivedData, setReceivedData] = useState(null);
   const [autoImporting, setAutoImporting] = useState(false);
   const [isJoiner, setIsJoiner] = useState(false);
+  const [pendingImport, setPendingImport] = useState(null); // data chờ user chọn merge/replace
 
   const encKeyRef    = useRef(encKey);
   const peerIdRef    = useRef(peerId);
@@ -107,13 +108,12 @@ export default function P2PSyncModal({
     };
 
     p2pService.onDataReceived = async (data) => {
-      // Auto import khi nhận dữ liệu (joiner side)
       if (data?.encryptedPayload && data?.encKey) {
         setAutoImporting(true);
         try {
           const imported = await p2pService.decryptAndImportPayload(data.encryptedPayload, data.encKey);
-          onSyncComplete(imported);
-          setReceivedData('ok');
+          // Dừng lại, hỏi user muốn merge hay replace
+          setPendingImport(imported);
         } catch (err) {
           setErrorMsg('Giải mã thất bại: ' + err.message);
         } finally {
@@ -150,7 +150,7 @@ export default function P2PSyncModal({
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setPeerId(''); setEncKey(''); setSyncKey(''); setInputKey('');
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setStatus('initializing'); setErrorMsg(''); setSentOk(false); setReceivedData(null); setStep('pick');
+      setStatus('initializing'); setErrorMsg(''); setSentOk(false); setReceivedData(null); setStep('pick'); setPendingImport(null);
     }
     return () => clearInterval(timerRef.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -186,6 +186,34 @@ export default function P2PSyncModal({
     } catch (e) {
       setErrorMsg('Không thể gửi: ' + e.message);
     }
+  };
+
+  // Merge: dữ liệu thiết bị kia + dữ liệu local, trùng ID thì giữ bên gửi (mới hơn)
+  const handleMerge = () => {
+    if (!pendingImport) return;
+    const local = syncDataRef.current;
+    const mergeById = (incoming = [], existing = []) => {
+      const map = new Map(existing.map(item => [item.id, item]));
+      incoming.forEach(item => map.set(item.id, item)); // incoming thắng khi trùng id
+      return Array.from(map.values());
+    };
+    const merged = {
+      connections: mergeById(pendingImport.connections, local.connections),
+      keys:        mergeById(pendingImport.keys,        local.keys),
+      identities:  mergeById(pendingImport.identities,  local.identities),
+      settings:    pendingImport.settings, // settings dùng của bên gửi
+    };
+    onSyncComplete(merged);
+    setPendingImport(null);
+    setReceivedData('ok');
+  };
+
+  // Replace: thay hoàn toàn bằng dữ liệu bên gửi
+  const handleReplace = () => {
+    if (!pendingImport) return;
+    onSyncComplete(pendingImport);
+    setPendingImport(null);
+    setReceivedData('ok');
   };
 
   const handleCopy = () => {
@@ -380,11 +408,48 @@ export default function P2PSyncModal({
             )}
             {isJoiner && receivedData !== 'ok' && (
               <>
-                <span className="p2p-action-title">WAITING FOR DATA</span>
-                {autoImporting
-                  ? <><RefreshCw size={18} className="animate-spin text-accent" /><p className="text-xs text-text-muted">Importing...</p></>
-                  : <p className="text-xs text-text-muted text-center">Waiting for the other device to send data...</p>
-                }
+                {pendingImport ? (
+                  /* ── Dialog chọn Merge / Replace ── */
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, width: '100%' }}>
+                    <span className="p2p-action-title">DATA RECEIVED</span>
+                    <p className="text-xs text-text-muted text-center">
+                      Received <b>{pendingImport.connections?.length ?? 0}</b> hosts,{' '}
+                      <b>{pendingImport.keys?.length ?? 0}</b> keys,{' '}
+                      <b>{pendingImport.identities?.length ?? 0}</b> identities.
+                      <br />How do you want to apply this data?
+                    </p>
+                    <div style={{ display: 'flex', gap: 10, width: '100%' }}>
+                      <button
+                        className="glass-button w-full flex flex-col items-center gap-1"
+                        style={{ padding: '14px 10px', borderRadius: 12 }}
+                        onClick={handleMerge}
+                      >
+                        <span style={{ fontSize: 13, fontWeight: 700 }}>Merge</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>
+                          Combine with your existing data.<br />Duplicates use incoming version.
+                        </span>
+                      </button>
+                      <button
+                        className="glass-button active w-full flex flex-col items-center gap-1"
+                        style={{ padding: '14px 10px', borderRadius: 12 }}
+                        onClick={handleReplace}
+                      >
+                        <span style={{ fontSize: 13, fontWeight: 700 }}>Replace</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>
+                          Overwrite all your data<br />with incoming data.
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <span className="p2p-action-title">WAITING FOR DATA</span>
+                    {autoImporting
+                      ? <><RefreshCw size={18} className="animate-spin text-accent" /><p className="text-xs text-text-muted">Decrypting...</p></>
+                      : <p className="text-xs text-text-muted text-center">Waiting for the other device to send data...</p>
+                    }
+                  </>
+                )}
               </>
             )}
             {receivedData === 'ok' && (
