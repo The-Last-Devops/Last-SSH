@@ -5,7 +5,7 @@
 # Last SSH
 
 [![Build and Release](https://github.com/The-Last-Devops/Last-SSH/actions/workflows/build.yml/badge.svg)](https://github.com/The-Last-Devops/Last-SSH/actions/workflows/build.yml)
-[![Docker Image](https://ghcr.io/the-last-devops/last-ssh)](https://github.com/The-Last-Devops/Last-SSH/pkgs/container/last-ssh)
+[![Docker Image](https://img.shields.io/badge/docker-ghcr.io%2Fthe--last--devops%2Flast--ssh-blue?logo=docker)](https://github.com/The-Last-Devops/Last-SSH/pkgs/container/last-ssh)
 
 A modern SSH/SFTP client available as both a **Desktop app** (Electron) and a **Web app** (self-hosted via Docker). Built with React 19, Vite, and Node.js.
 
