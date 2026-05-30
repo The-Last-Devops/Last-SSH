@@ -1,16 +1,20 @@
 // storageService.js
 // Drop-in wrapper cho localStorage.
-// Trong Electron: mỗi write đồng thời ghi vào file JSON trên disk qua IPC (không phụ thuộc Chromium flush).
-// Trong browser/test: dùng localStorage thuần.
-// Reads vẫn dùng localStorage (sync) — init() seed dữ liệu từ file vào localStorage khi khởi động.
+// Electron: write vào file JSON qua IPC.
+// Web: write qua WebSocket server (window.webAPI).
+// Browser/test: chỉ dùng localStorage.
 
-const isElectron = () => typeof window !== 'undefined' && !!window.electronAPI?.store;
+function getBackendStore() {
+  if (typeof window === 'undefined') return null;
+  return window.electronAPI?.store ?? window.webAPI?.store ?? null;
+}
 
 export const storageService = {
   async init() {
-    if (!isElectron()) return;
+    const store = getBackendStore();
+    if (!store) return;
     try {
-      const all = await window.electronAPI.store.getAll();
+      const all = await store.getAll();
       for (const [key, value] of Object.entries(all)) {
         if (value !== null && value !== undefined) {
           localStorage.setItem(key, value);
@@ -23,16 +27,14 @@ export const storageService = {
 
   setItem(key, value) {
     localStorage.setItem(key, value);
-    if (isElectron()) {
-      window.electronAPI.store.set(key, value).catch(console.error);
-    }
+    const store = getBackendStore();
+    if (store) store.set(key, value).catch(console.error);
   },
 
   removeItem(key) {
     localStorage.removeItem(key);
-    if (isElectron()) {
-      window.electronAPI.store.remove(key).catch(console.error);
-    }
+    const store = getBackendStore();
+    if (store) store.remove(key).catch(console.error);
   },
 
   getItem(key) {

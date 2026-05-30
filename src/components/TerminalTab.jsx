@@ -60,7 +60,9 @@ export default function TerminalTab({
   onUpdateTab,
   onSwitchToSFTP
 }) {
-  const isDesktop = typeof window !== 'undefined' && window.electronAPI !== undefined;
+  // api: Electron IPC hoặc WebSocket adapter — cả hai đều có cùng interface
+  const api = (typeof window !== 'undefined') ? (window.electronAPI ?? window.webAPI ?? null) : null;
+  const isDesktop = !!api;
 
   // --------------------------------------------------------------------------
   // ENGINE 1: DUAL ENGINE DESKTOP APP (Xterm.js + Electron SSH2 thật)
@@ -145,9 +147,9 @@ export default function TerminalTab({
           const { cols, rows } = term;
           if (cols > 0 && rows > 0) {
             if (tab.type === 'ssh') {
-              window.electronAPI.resizeSSH({ tabId: tab.id, cols, rows });
+              api.resizeSSH({ tabId: tab.id, cols, rows });
             } else if (tab.type === 'local') {
-              window.electronAPI.resizeLocal({ tabId: tab.id, cols, rows });
+              api.resizeLocal({ tabId: tab.id, cols, rows });
             }
           }
         }
@@ -183,7 +185,7 @@ export default function TerminalTab({
     // Đăng ký luồng nhận dữ liệu từ Electron truyền lên
     if (tab.type === 'ssh') {
       let shellSizeConfirmed = false;
-      removeDataListener = window.electronAPI.onSSHData((payload) => {
+      removeDataListener = api.onSSHData((payload) => {
         if (payload.tabId === tab.id) {
           term.write(payload.data);
           // Khi nhận data đầu tiên, shell đã sẵn sàng — gửi lại kích thước thực tế
@@ -191,26 +193,26 @@ export default function TerminalTab({
             shellSizeConfirmed = true;
             const { cols, rows } = term;
             if (cols > 0 && rows > 0) {
-              window.electronAPI.resizeSSH({ tabId: tab.id, cols, rows });
+              api.resizeSSH({ tabId: tab.id, cols, rows });
             }
           }
         }
       });
 
       // Lắng nghe đóng kết nối SSH
-      removeCloseListener = window.electronAPI.onSSHClose((closedTabId) => {
+      removeCloseListener = api.onSSHClose((closedTabId) => {
         if (closedTabId === tab.id) {
           term.write('\r\n\x1b[1;31m[SSH] Kết nối bị đóng bởi server từ xa.\x1b[0m\r\n');
         }
       });
     } else if (tab.type === 'local') {
-      removeDataListener = window.electronAPI.onLocalData((payload) => {
+      removeDataListener = api.onLocalData((payload) => {
         if (payload.tabId === tab.id) {
           term.write(payload.data);
         }
       });
 
-      removeCloseListener = window.electronAPI.onLocalClose((closedTabId) => {
+      removeCloseListener = api.onLocalClose((closedTabId) => {
         if (closedTabId === tab.id) {
           term.write('\r\n\x1b[1;31m[Local shell đã đóng]\x1b[0m\r\n');
         }
@@ -220,17 +222,17 @@ export default function TerminalTab({
     // Đăng ký luồng gõ phím từ Xterm gửi xuống Electron qua IPC
     const onDataDisposable = term.onData((data) => {
       if (tab.type === 'ssh') {
-        window.electronAPI.writeSSHData(tab.id, data);
+        api.writeSSHData(tab.id, data);
       } else if (tab.type === 'local') {
-        window.electronAPI.writeLocalData(tab.id, data);
+        api.writeLocalData(tab.id, data);
       }
     });
 
     // Kết nối đến SSH hoặc Local shell thật
     if (tab.type === 'ssh') {
-      window.electronAPI.connectSSH(tab.connectionProfile);
+      api.connectSSH(tab.connectionProfile);
     } else if (tab.type === 'local') {
-      window.electronAPI.connectLocalShell({ tabId: tab.id });
+      api.connectLocalShell({ tabId: tab.id });
     }
 
     // Xử lý co giãn terminal khi thay đổi kích thước cửa sổ

@@ -113,9 +113,8 @@ export default function App() {
     }
     
     // Proactively flush to disk immediately after saving
-    if (typeof window !== 'undefined' && window.electronAPI?.flushStorage) {
-      window.electronAPI.flushStorage().catch(() => {});
-    }
+    const _api = (typeof window !== 'undefined') ? (window.electronAPI ?? window.webAPI ?? null) : null;
+    if (_api?.flushStorage) _api.flushStorage().catch(() => {});
   };
 
 
@@ -238,7 +237,7 @@ export default function App() {
     const tabId = crypto.randomUUID();
     resolvedProfile.tabId = tabId; // Truyền tabId để Electron quản lý session
 
-    const isDesktop = typeof window !== 'undefined' && window.electronAPI !== undefined;
+    const isDesktop = typeof window !== 'undefined' && !!(window.electronAPI ?? window.webAPI);
 
     const initialHistory = [
       { type: 'system', text: `\r\nStarting SSH connection to ${resolvedProfile.label || resolvedProfile.host}...` }

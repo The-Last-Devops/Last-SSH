@@ -4,6 +4,7 @@ import '@fontsource-variable/outfit'
 import '@fontsource-variable/fira-code'
 import '@fontsource-variable/source-code-pro'
 import './index.css'
+import './services/wsClient.js'
 import App from './App.jsx'
 
 const loadTime = performance.now() - window.__APP_START_TIME__;

@@ -4,7 +4,16 @@
 
 # Last SSH
 
-A modern Desktop application for managing SSH and SFTP servers, built with Electron, ReactJS, and Vite. The application allows you to easily manage connection information, security keys, synchronize data across devices, and utilize a stylish integrated Terminal.
+[![Build and Release](https://github.com/The-Last-Devops/Last-SSH/actions/workflows/build.yml/badge.svg)](https://github.com/The-Last-Devops/Last-SSH/actions/workflows/build.yml)
+[![Docker Image](https://ghcr.io/the-last-devops/last-ssh)](https://github.com/The-Last-Devops/Last-SSH/pkgs/container/last-ssh)
+
+A modern SSH/SFTP client available as both a **Desktop app** (Electron) and a **Web app** (self-hosted via Docker). Built with React 19, Vite, and Node.js.
+
+```bash
+docker run -p 3000:3000 ghcr.io/the-last-devops/last-ssh:latest
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## 🚀 Key Features
 
@@ -84,3 +93,62 @@ The application supports cross-platform packaging thanks to the `electron-builde
    - **Linux**: `npx electron-builder --linux`
 
 The packaged installation files (such as `.dmg`, `.exe`, `.AppImage`) will be saved in the `dist-electron` folder.
+
+## 🐳 Docker (Web Version)
+
+The web version runs as a self-hosted Node.js server with real SSH/SFTP support.
+
+**Docker image:** `ghcr.io/the-last-devops/last-ssh:latest`
+
+### Quick start
+
+```bash
+docker run -d \
+  -p 3000:3000 \
+  -v last-ssh-data:/data \
+  --name last-ssh \
+  ghcr.io/the-last-devops/last-ssh:latest
+```
+
+### Docker Compose
+
+```yaml
+services:
+  last-ssh:
+    image: ghcr.io/the-last-devops/last-ssh:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - last-ssh-data:/data
+    restart: unless-stopped
+
+volumes:
+  last-ssh-data:
+```
+
+### Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3000` | HTTP/WebSocket port |
+| `DATA_DIR` | `~/.last-ssh-web` | Directory for `store.json` and `known_hosts.json` |
+
+## Kubernetes Deploy
+
+Manifests are in the [`k8s/`](k8s/) directory.
+
+```bash
+# 1. Edit k8s/ingress.yaml — replace ssh.yourdomain.com with your domain
+# 2. Apply all manifests
+kubectl apply -f k8s/
+
+# Verify
+kubectl get pods,svc,ingress
+```
+
+Files:
+- [`k8s/deployment.yaml`](k8s/deployment.yaml) — Deployment + PersistentVolumeClaim
+- [`k8s/service.yaml`](k8s/service.yaml) — ClusterIP Service
+- [`k8s/ingress.yaml`](k8s/ingress.yaml) — Ingress with WebSocket + TLS (nginx + cert-manager)
+
+> Requires: nginx ingress controller, cert-manager with a `letsencrypt-prod` ClusterIssuer.

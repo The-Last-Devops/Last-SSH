@@ -48,7 +48,8 @@ function FileIcon() {
 }
 
 export default function SFTPBrowser({ tabId, currentPath = '', onNavigate, onTerminalLog }) {
-  const isDesktop = typeof window !== 'undefined' && window.electronAPI !== undefined;
+  const api = (typeof window !== 'undefined') ? (window.electronAPI ?? window.webAPI ?? null) : null;
+  const isDesktop = !!api;
   const [items, setItems] = useState([]);
   const [dragActive, setDragActive] = useState(false);
   const [isSftpReady, setIsSftpReady] = useState(!isDesktop);
@@ -65,7 +66,7 @@ export default function SFTPBrowser({ tabId, currentPath = '', onNavigate, onTer
     setIsLoading(true);
     if (isDesktop) {
       try {
-        const fileList = await window.electronAPI.sftpList(currentPath);
+        const fileList = await api.sftpList(currentPath);
         setItems(fileList);
         setSftpError(null);
       } catch (err) {
@@ -87,14 +88,14 @@ export default function SFTPBrowser({ tabId, currentPath = '', onNavigate, onTer
       return;
     }
     let mounted = true;
-    window.electronAPI.sftpStatus().then(s => {
+    api.sftpStatus().then(s => {
       if (mounted && s?.ready) setIsSftpReady(true);
     }).catch(() => {});
     const handleSftpReady = (r) => {
       if (r?.success) { setIsSftpReady(true); setSftpError(null); }
       else { setSftpError(r?.error || 'SFTP unavailable'); setIsSftpReady(false); }
     };
-    const unsub = window.electronAPI.onSFTPReady(handleSftpReady);
+    const unsub = api.onSFTPReady(handleSftpReady);
     return () => { mounted = false; unsub(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId, isDesktop]);
@@ -147,7 +148,7 @@ export default function SFTPBrowser({ tabId, currentPath = '', onNavigate, onTer
     if (!name) return;
     setShowMkdirInput(false); setMkdirName('');
     if (isDesktop) {
-      try { await window.electronAPI.sftpMkdir(currentPath, name); loadFiles(); }
+      try { await api.sftpMkdir(currentPath, name); loadFiles(); }
       catch (err) { alert('Cannot create folder: ' + err.message); }
     } else {
       sshSimulator.sftpMkdir(tabId, currentPath, name);
@@ -167,7 +168,7 @@ export default function SFTPBrowser({ tabId, currentPath = '', onNavigate, onTer
       setUploadProgress({ current: i + 1, total: files.length, filename: file.name, done: false });
       try {
         const content = await readFileContent(file);
-        if (isDesktop) await window.electronAPI.sftpUpload(currentPath, file.name, content);
+        if (isDesktop) await api.sftpUpload(currentPath, file.name, content);
         else sshSimulator.sftpUpload(tabId, currentPath, file.name, content);
         if (onTerminalLog) onTerminalLog(`\r\nsftp: uploaded '${file.name}' (${formatSize(file.size)})`);
       } catch (err) {
@@ -184,7 +185,7 @@ export default function SFTPBrowser({ tabId, currentPath = '', onNavigate, onTer
   const handleDownload = async (fileName) => {
     try {
       const content = isDesktop
-        ? await window.electronAPI.sftpDownload(currentPath, fileName)
+        ? await api.sftpDownload(currentPath, fileName)
         : sshSimulator.sftpDownload(tabId, currentPath, fileName);
       if (content === null) return;
       const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
@@ -201,7 +202,7 @@ export default function SFTPBrowser({ tabId, currentPath = '', onNavigate, onTer
     e.stopPropagation();
     if (!confirm(`Delete '${item.name}' on remote server?`)) return;
     if (isDesktop) {
-      try { await window.electronAPI.sftpRm(currentPath, item.name); loadFiles(); }
+      try { await api.sftpRm(currentPath, item.name); loadFiles(); }
       catch (err) { alert('Cannot delete: ' + err.message); }
     } else {
       sshSimulator.sftpRm(tabId, currentPath, item.name);
@@ -222,7 +223,7 @@ export default function SFTPBrowser({ tabId, currentPath = '', onNavigate, onTer
     for (const file of files) {
       try {
         const content = await readFileContent(file);
-        if (isDesktop) await window.electronAPI.sftpUpload(currentPath, file.name, content);
+        if (isDesktop) await api.sftpUpload(currentPath, file.name, content);
         else sshSimulator.sftpUpload(tabId, currentPath, file.name, content);
         if (onTerminalLog) onTerminalLog(`\r\nsftp: dropped & uploaded '${file.name}'`);
       } catch (err) { if (onTerminalLog) onTerminalLog(`\r\nsftp error: ${err.message}`); }

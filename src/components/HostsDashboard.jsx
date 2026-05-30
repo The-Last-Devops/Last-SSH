@@ -402,12 +402,13 @@ export default function HostsDashboard({
   };
 
   // Known Hosts helpers
-  const isDesktop = typeof window !== 'undefined' && !!window.electronAPI?.getKnownHosts;
+  const api = (typeof window !== 'undefined') ? (window.electronAPI ?? window.webAPI ?? null) : null;
+  const isDesktop = !!(api?.getKnownHosts);
 
   const loadKnownHosts = async () => {
     if (!isDesktop) return;
     try {
-      const hosts = await window.electronAPI.getKnownHosts();
+      const hosts = await api.getKnownHosts();
       setKnownHostsList(
         Object.entries(hosts).map(([hostPort, fingerprint]) => ({ hostPort, fingerprint }))
       );
@@ -417,7 +418,7 @@ export default function HostsDashboard({
   const handleForgetHost = async (hostPort) => {
     if (!isDesktop) return;
     try {
-      await window.electronAPI.forgetHost(hostPort);
+      await api.forgetHost(hostPort);
       setKnownHostsList(prev => prev.filter(h => h.hostPort !== hostPort));
     } catch { /* ignore */ }
   };

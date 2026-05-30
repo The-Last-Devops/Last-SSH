@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: last-ssh
+  labels:
+    app: last-ssh
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: last-ssh
+  template:
+    metadata:
+      labels:
+        app: last-ssh
+    spec:
+      containers:
+        - name: last-ssh
+          image: ghcr.io/the-last-devops/last-ssh:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: PORT
+              value: "3000"
+            - name: DATA_DIR
+              value: /data
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: last-ssh-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: last-ssh-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
