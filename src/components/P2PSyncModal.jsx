@@ -30,7 +30,7 @@ export default function P2PSyncModal({
   const [step, setStep]             = useState('pick');
   const [peerId, setPeerId]         = useState('');
   const [encKey, setEncKey]         = useState('');
-  const [timeLeft, setTimeLeft]     = useState(300);
+  const [timeLeft, setTimeLeft]     = useState(120);
   const [syncKey, setSyncKey]       = useState('');
   const [inputKey, setInputKey]     = useState('');
   const [status, setStatus]         = useState('initializing');
@@ -45,17 +45,18 @@ export default function P2PSyncModal({
   const peerIdRef    = useRef(peerId);
   const timerRef     = useRef(null);
   const isJoinerRef  = useRef(false);
+  const syncDataRef  = useRef({ connections, settings, keys, identities });
 
   // Cập nhật ref khi state đổi
   useEffect(() => { encKeyRef.current = encKey; }, [encKey]);
   useEffect(() => { peerIdRef.current = peerId; }, [peerId]);
+  useEffect(() => { syncDataRef.current = { connections, settings, keys, identities }; }, [connections, settings, keys, identities]);
 
-  // Hàm rotate enc key mỗi 30s
   const rotateKey = () => {
     const newKey = genEncKey();
     setEncKey(newKey);
     encKeyRef.current = newKey;
-    setTimeLeft(300);
+    setTimeLeft(120);
     if (peerIdRef.current) {
       setSyncKey(`LSSH::${peerIdRef.current}::${newKey}`);
     }
@@ -72,7 +73,7 @@ export default function P2PSyncModal({
     const initialKey = genEncKey();
     setEncKey(initialKey);
     encKeyRef.current = initialKey;
-    setTimeLeft(300);
+    setTimeLeft(120);
 
     p2pService.sessionEncKey = '';
 
@@ -91,9 +92,18 @@ export default function P2PSyncModal({
       }
     };
 
-    // Host nhận enc key từ joiner → lưu để dùng khi gửi
-    p2pService.onKeyExchanged = (k) => {
+    // Host nhận enc key từ joiner → lưu và tự động gửi dữ liệu ngay
+    p2pService.onKeyExchanged = async (k) => {
       p2pService.sessionEncKey = k;
+      if (!isJoinerRef.current) {
+        try {
+          const { connections: c, settings: s, keys: ks, identities: ids } = syncDataRef.current;
+          await p2pService.sendPayload(c, s, ks, ids);
+          setSentOk(true);
+        } catch (e) {
+          setErrorMsg('Không thể gửi: ' + e.message);
+        }
+      }
     };
 
     p2pService.onDataReceived = async (data) => {
@@ -123,7 +133,7 @@ export default function P2PSyncModal({
       setTimeLeft(prev => {
         if (prev <= 1) {
           rotateKey();
-          return 300;
+          return 60;
         }
         return prev - 1;
       });
@@ -275,7 +285,7 @@ export default function P2PSyncModal({
             )}
 
             <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
-              Share this key with the other device. It refreshes every 5 minutes for security.
+              Share this key with the other device. It refreshes every 2 minutes for security.
             </p>
 
             {peerId ? (
@@ -291,10 +301,10 @@ export default function P2PSyncModal({
                   {syncKey.slice(-8)}
                 </div>
                 <div style={{ height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 99 }}>
-                  <div style={{ height: '100%', borderRadius: 99, transition: 'width 1s linear, background 1s', background: timeLeft <= 30 ? '#f87171' : '#3b82f6', width: `${(timeLeft / 300) * 100}%` }} />
+                  <div style={{ height: '100%', borderRadius: 99, transition: 'width 1s linear, background 1s', background: timeLeft <= 15 ? '#f87171' : '#3b82f6', width: `${(timeLeft / 120) * 100}%` }} />
                 </div>
-                <div style={{ fontSize: 11, color: timeLeft <= 30 ? '#f87171' : '#9ca3af' }}>
-                  Expires in {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+                <div style={{ fontSize: 11, color: timeLeft <= 15 ? '#f87171' : '#9ca3af' }}>
+                  Expires in {timeLeft}s
                 </div>
               </div>
             ) : (

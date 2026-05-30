@@ -772,7 +772,7 @@ body.theme-light .kc-card {
 }
 
 .simulated-view-container h2 {
-  color: var(--termius-dark-text-bright);
+  color: var(--text-bright);
   font-size: 18px;
   margin-bottom: 8px;
 }
