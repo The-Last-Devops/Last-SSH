@@ -112,8 +112,33 @@ export default function P2PSyncModal({
         setAutoImporting(true);
         try {
           const imported = await p2pService.decryptAndImportPayload(data.encryptedPayload, data.encKey);
-          // Dừng lại, hỏi user muốn merge hay replace
-          setPendingImport(imported);
+          const local = syncDataRef.current;
+
+          // Kiểm tra có item nào trùng ID không
+          const hasConflict = (incoming = [], existing = []) => {
+            const existingIds = new Set(existing.map(i => i.id));
+            return incoming.some(i => existingIds.has(i.id));
+          };
+
+          const conflict =
+            hasConflict(imported.connections, local.connections) ||
+            hasConflict(imported.keys,        local.keys)        ||
+            hasConflict(imported.identities,  local.identities);
+
+          if (!conflict) {
+            // Không trùng → merge ngay, không hỏi
+            const merged = {
+              connections: [...(local.connections || []), ...(imported.connections || [])],
+              keys:        [...(local.keys        || []), ...(imported.keys        || [])],
+              identities:  [...(local.identities  || []), ...(imported.identities  || [])],
+              settings:    imported.settings,
+            };
+            onSyncComplete(merged);
+            setReceivedData('ok');
+          } else {
+            // Có trùng → hỏi user
+            setPendingImport(imported);
+          }
         } catch (err) {
           setErrorMsg('Giải mã thất bại: ' + err.message);
         } finally {
@@ -411,32 +436,44 @@ export default function P2PSyncModal({
                 {pendingImport ? (
                   /* ── Dialog chọn Merge / Replace ── */
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, width: '100%' }}>
-                    <span className="p2p-action-title">DATA RECEIVED</span>
+                    <span className="p2p-action-title">CONFLICTS DETECTED</span>
                     <p className="text-xs text-text-muted text-center">
-                      Received <b>{pendingImport.connections?.length ?? 0}</b> hosts,{' '}
-                      <b>{pendingImport.keys?.length ?? 0}</b> keys,{' '}
-                      <b>{pendingImport.identities?.length ?? 0}</b> identities.
-                      <br />How do you want to apply this data?
+                      Some items already exist on this device. What should happen to the <b>duplicates</b>?
                     </p>
                     <div style={{ display: 'flex', gap: 10, width: '100%' }}>
                       <button
-                        className="glass-button w-full flex flex-col items-center gap-1"
+                        className="glass-button active w-full flex flex-col items-center gap-1"
                         style={{ padding: '14px 10px', borderRadius: 12 }}
                         onClick={handleMerge}
                       >
-                        <span style={{ fontSize: 13, fontWeight: 700 }}>Merge</span>
+                        <span style={{ fontSize: 13, fontWeight: 700 }}>Keep incoming</span>
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>
-                          Combine with your existing data.<br />Duplicates use incoming version.
+                          Duplicates use the version<br />from the other device.
                         </span>
                       </button>
                       <button
-                        className="glass-button active w-full flex flex-col items-center gap-1"
+                        className="glass-button w-full flex flex-col items-center gap-1"
                         style={{ padding: '14px 10px', borderRadius: 12 }}
-                        onClick={handleReplace}
+                        onClick={() => {
+                          // Giữ bản local khi trùng, chỉ thêm item mới
+                          const local = syncDataRef.current;
+                          const mergeKeepLocal = (incoming = [], existing = []) => {
+                            const existingIds = new Set(existing.map(i => i.id));
+                            return [...existing, ...incoming.filter(i => !existingIds.has(i.id))];
+                          };
+                          onSyncComplete({
+                            connections: mergeKeepLocal(pendingImport.connections, local.connections),
+                            keys:        mergeKeepLocal(pendingImport.keys,        local.keys),
+                            identities:  mergeKeepLocal(pendingImport.identities,  local.identities),
+                            settings:    pendingImport.settings,
+                          });
+                          setPendingImport(null);
+                          setReceivedData('ok');
+                        }}
                       >
-                        <span style={{ fontSize: 13, fontWeight: 700 }}>Replace</span>
+                        <span style={{ fontSize: 13, fontWeight: 700 }}>Keep mine</span>
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>
-                          Overwrite all your data<br />with incoming data.
+                          Keep your existing version,<br />only add new items.
                         </span>
                       </button>
                     </div>
