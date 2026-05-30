@@ -73,10 +73,20 @@ function createWebAPI() {
       connected = true;
       if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
       console.log('[wsClient] Connected to server');
+      // Ping mỗi 30s để giữ connection — tránh bị nginx/Cloudflare cắt sau 60s idle
+      const pingInterval = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'ping' }));
+        } else {
+          clearInterval(pingInterval);
+        }
+      }, 30000);
+      ws._pingInterval = pingInterval;
     };
 
     ws.onclose = () => {
       connected = false;
+      if (ws?._pingInterval) clearInterval(ws._pingInterval);
       ws = null;
       // Reject tất cả pending requests
       Object.values(pendingRequests).forEach(({ reject: rej, timer }) => {

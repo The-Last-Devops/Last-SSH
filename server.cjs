@@ -376,6 +376,9 @@ wss.on('connection', (ws, req) => {
 
     } else if (type === 'flush-storage') {
       reply(reqId, true);
+
+    } else if (type === 'ping') {
+      // keepalive — không cần reply
     }
   });
 

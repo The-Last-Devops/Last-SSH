@@ -14,6 +14,9 @@ spec:
       labels:
         app: last-ssh
     spec:
+      # Xóa imagePullSecrets nếu image đã được set public trên GitHub Packages
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: last-ssh
           image: ghcr.io/the-last-devops/last-ssh:latest

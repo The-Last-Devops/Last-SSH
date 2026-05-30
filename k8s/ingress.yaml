@@ -3,24 +3,17 @@ kind: Ingress
 metadata:
   name: last-ssh
   annotations:
-    # nginx ingress controller
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-    # WebSocket support — bắt buộc cho SSH terminal
+    # WebSocket upgrade — nginx ingress xử lý tự động khi set http version 1.1
     nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      proxy_set_header Upgrade $http_upgrade;
-      proxy_set_header Connection "upgrade";
-    # TLS redirect
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    # cert-manager tự động cấp TLS (xóa nếu không dùng cert-manager)
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # Tắt buffering để data SSH/terminal stream realtime
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
 spec:
   ingressClassName: nginx
   tls:
     - hosts:
         - ssh.yourdomain.com   # <-- thay bằng domain của bạn
-      secretName: last-ssh-tls
   rules:
     - host: ssh.yourdomain.com  # <-- thay bằng domain của bạn
       http:
